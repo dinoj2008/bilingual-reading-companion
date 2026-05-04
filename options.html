@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Bilingual Reading Companion</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --border: #d7dce2;
+      --muted: #5f6b7a;
+      --text: #1f2933;
+      --blue: #2563eb;
+      --blue-dark: #1d4ed8;
+      --surface: #f7f9fc;
+      --success-bg: #e6f4ea;
+      --success-text: #176b3a;
+      --error-bg: #fde8e8;
+      --error-text: #9b1c1c;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      max-width: 100%;
+      overflow-x: hidden;
+    }
+
+    body {
+      width: auto;
+      max-width: 720px;
+      min-width: 0;
+      min-height: 680px;
+      margin: 0;
+      padding: 18px;
+      overflow-y: auto;
+      color: var(--text);
+      background: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      font-size: 14px;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    header img {
+      width: 32px;
+      height: 32px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 20px;
+      line-height: 1.2;
+    }
+
+    .language-control {
+      width: 160px;
+    }
+
+    .language-control label {
+      margin-bottom: 4px;
+      font-size: 12px;
+    }
+
+    h2 {
+      margin: 0 0 12px;
+      font-size: 15px;
+      line-height: 1.2;
+    }
+
+    section {
+      padding: 14px 0;
+      border-top: 1px solid #edf0f4;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 6px;
+      font-weight: 600;
+      color: #2f3b48;
+    }
+
+    input[type="text"],
+    input[type="password"],
+    select,
+    textarea {
+      width: 100%;
+      padding: 9px 10px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: #fff;
+      color: var(--text);
+      font-size: 13px;
+    }
+
+    textarea {
+      resize: vertical;
+    }
+
+    input[type="checkbox"] {
+      margin: 0;
+    }
+
+    .row {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .row > * {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .form-group {
+      margin-bottom: 12px;
+    }
+
+    .hint {
+      margin-top: 5px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.4;
+    }
+
+    .check-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
+      font-weight: 600;
+    }
+
+    .check-row label {
+      margin: 0;
+    }
+
+    .toolbar {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+
+    .toolbar select {
+      flex: 1;
+      min-width: 180px;
+    }
+
+    button {
+      min-height: 36px;
+      padding: 8px 13px;
+      border: 0;
+      border-radius: 6px;
+      background: var(--blue);
+      color: #fff;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+      white-space: nowrap;
+      max-width: 100%;
+    }
+
+    button:hover {
+      background: var(--blue-dark);
+    }
+
+    button.secondary {
+      background: #64748b;
+    }
+
+    button.secondary:hover {
+      background: #475569;
+    }
+
+    button.danger {
+      background: #b42318;
+    }
+
+    button.danger:hover {
+      background: #912018;
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    .actions #save {
+      flex: 2;
+    }
+
+    .actions #reset {
+      flex: 1;
+    }
+
+    #status {
+      min-height: 28px;
+      margin-top: 12px;
+      padding: 7px 9px;
+      border-radius: 6px;
+      font-size: 13px;
+    }
+
+    .success {
+      background: var(--success-bg);
+      color: var(--success-text);
+    }
+
+    .error {
+      background: var(--error-bg);
+      color: var(--error-text);
+    }
+
+    #debugLog {
+      height: 90px;
+      color: #46515f;
+      background: var(--surface);
+      font-size: 11px;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    @media (max-width: 460px) {
+      body {
+        padding: 12px;
+      }
+
+      .row,
+      .toolbar,
+      .actions {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .toolbar select,
+      .language-control,
+      button {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <div class="brand">
+      <img src="icons/translator-v2-32.png" alt="">
+      <h1 data-i18n="appTitle">Bilingual Reading Companion</h1>
+    </div>
+    <div class="language-control">
+      <label for="optionsLanguage" data-i18n="languageLabel">Language</label>
+      <select id="optionsLanguage">
+        <option value="auto" data-i18n="languageAuto">Auto</option>
+        <option value="en" data-i18n="languageEnglish">English</option>
+        <option value="zh-CN" data-i18n="languageChinese">中文</option>
+      </select>
+    </div>
+  </header>
+
+  <section>
+    <h2 data-i18n="providerProfiles">Provider Profiles</h2>
+    <div class="toolbar">
+      <select id="providerSelect"></select>
+      <button id="addProvider" class="secondary" data-i18n="newProvider">New</button>
+      <button id="deleteProvider" class="danger" data-i18n="deleteProvider">Delete</button>
+    </div>
+
+    <div class="form-group">
+      <label for="providerName" data-i18n="profileName">Profile Name</label>
+      <input type="text" id="providerName" placeholder="Mac Mini Open WebUI" data-i18n-placeholder="profileNamePlaceholder">
+    </div>
+
+    <div class="form-group">
+      <label for="providerType" data-i18n="providerType">Provider Type</label>
+      <select id="providerType">
+        <option value="openai">OpenAI Compatible</option>
+        <option value="gemini">Gemini Native</option>
+      </select>
+    </div>
+
+    <div class="form-group" id="apiUrlGroup">
+      <label for="apiUrl" data-i18n="apiUrl">API URL</label>
+      <input type="text" id="apiUrl" placeholder="http://127.0.0.1:3000/api/chat/completions">
+      <div class="hint" id="apiUrlHint" data-i18n="apiUrlHintOpenai">Supports Open WebUI, LM Studio, and most OpenAI-compatible chat completion APIs.</div>
+    </div>
+
+    <div class="form-group">
+      <label for="apiKey" data-i18n="apiKey">API Key</label>
+      <input type="password" id="apiKey" placeholder="sk-...">
+      <div class="hint" data-i18n="apiKeyHint">Stored in browser local storage. Leave empty for unauthenticated local endpoints.</div>
+    </div>
+
+    <div class="form-group">
+      <label for="modelSelect" data-i18n="model">Model</label>
+      <div class="row">
+        <select id="modelSelect"></select>
+        <button id="fetchModels" class="secondary" data-i18n="loadModels">Load Models</button>
+      </div>
+      <input type="text" id="modelName" placeholder="Custom model name" data-i18n-placeholder="customModelName" style="margin-top: 8px;">
+      <div class="hint" id="modelHint" data-i18n="modelHint">Load models to pick from a list, or type a custom model name.</div>
+    </div>
+  </section>
+
+  <section>
+    <h2 data-i18n="translationRouting">Translation Routing</h2>
+    <div class="row">
+      <div class="form-group">
+        <label for="pageProviderSelect" data-i18n="fullPage">Full Page</label>
+        <select id="pageProviderSelect"></select>
+      </div>
+      <div class="form-group">
+        <label for="selectionProviderSelect" data-i18n="selection">Selection</label>
+        <select id="selectionProviderSelect"></select>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="promptProfileSelect" data-i18n="translationStyle">Translation Style</label>
+      <select id="promptProfileSelect">
+        <option value="news" data-i18n="styleNews">News / faithful reporting</option>
+        <option value="general" data-i18n="styleGeneral">General / natural Chinese</option>
+        <option value="literary" data-i18n="styleLiterary">Literary / essay & fiction</option>
+        <option value="academic" data-i18n="styleAcademic">Academic / technical precision</option>
+      </select>
+      <div class="hint" data-i18n="translationStyleHint">Default is news: neutral, faithful, and no added interpretation. Use literary for essays, fiction, and The New Yorker style pieces.</div>
+    </div>
+  </section>
+
+  <section>
+    <h2 data-i18n="learningCapture">Learning Capture</h2>
+
+    <div class="check-row">
+      <input type="checkbox" id="enableObsidian">
+      <label for="enableObsidian" data-i18n="saveToObsidian">Save selections to Obsidian</label>
+    </div>
+
+    <div class="form-group">
+      <label for="obsidianMode" data-i18n="obsidianSync">Obsidian Sync</label>
+      <select id="obsidianMode">
+        <option value="uri" data-i18n="obsidianUri">Obsidian URI Scheme</option>
+        <option value="rest" data-i18n="obsidianRest">Local REST API (optional)</option>
+      </select>
+      <div class="hint" data-i18n="obsidianSyncHint">URI sync uses Obsidian's built-in app link and may show a browser confirmation. REST is kept as an optional quiet mode.</div>
+    </div>
+
+    <div id="obsidianUriGroup">
+      <div class="form-group">
+        <label for="obsidianVault" data-i18n="obsidianVault">Obsidian Vault</label>
+        <input type="text" id="obsidianVault" placeholder="My Vault" data-i18n-placeholder="obsidianVaultPlaceholder">
+      </div>
+    </div>
+
+    <div id="obsidianRestGroup">
+      <div class="form-group">
+        <label for="obsidianApiUrl" data-i18n="obsidianRestUrl">Obsidian REST API URL</label>
+        <input type="text" id="obsidianApiUrl" placeholder="https://127.0.0.1:27124">
+      </div>
+
+      <div class="form-group">
+        <label for="obsidianApiKey" data-i18n="obsidianRestKey">Obsidian REST API Key</label>
+        <input type="password" id="obsidianApiKey" placeholder="Paste Local REST API key" data-i18n-placeholder="obsidianRestKeyPlaceholder">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="obsidianFile" data-i18n="obsidianNote">Obsidian Note</label>
+      <input type="text" id="obsidianFile" placeholder="Language Learning/Browser Selections.md">
+      <div class="hint" data-i18n="obsidianNoteHint">Path inside your vault. REST mode will create it if needed.</div>
+    </div>
+
+    <div class="check-row">
+      <input type="checkbox" id="translateTermContext">
+      <label for="translateTermContext" data-i18n="translateTermContext">Translate context when saving term cards</label>
+    </div>
+    <div class="hint" data-i18n="translateTermContextHint">Adds one extra LLM request for words and short phrases, then writes the paragraph translation into Obsidian. Passage cards keep using the selected translation.</div>
+
+    <div class="check-row">
+      <input type="checkbox" id="returnFocusAfterObsidianSave">
+      <label for="returnFocusAfterObsidianSave" data-i18n="returnFocus">Return focus to browser after Obsidian save</label>
+    </div>
+    <div class="hint" data-i18n="returnFocusHint">After triggering the Obsidian app link, the extension will bring the current Edge window back so you can keep reading.</div>
+
+    <div class="check-row">
+      <input type="checkbox" id="enableEudic">
+      <label for="enableEudic" data-i18n="addToEudic">Add short selections to Eudic</label>
+    </div>
+
+    <div class="form-group">
+      <label for="eudicToken" data-i18n="eudicAuthorization">Eudic Authorization</label>
+      <input type="password" id="eudicToken" placeholder="Paste OpenAPI authorization text" data-i18n-placeholder="eudicAuthorizationPlaceholder">
+      <div class="hint" data-i18n="eudicAuthorizationHint">Get it from my.eudic.net/OpenAPI/Authorization after logging in. You can paste the copied authorization value directly.</div>
+    </div>
+
+    <div class="row">
+      <div class="form-group">
+        <label for="eudicCategoryName" data-i18n="wordBook">Word Book</label>
+        <input type="text" id="eudicCategoryName" placeholder="browser-selection">
+      </div>
+      <div class="form-group">
+        <label for="eudicLanguage" data-i18n="eudicLanguage">Language</label>
+        <input type="text" id="eudicLanguage" placeholder="en">
+      </div>
+    </div>
+
+    <div class="hint" data-i18n="eudicHint">Eudic is best for words and short phrases. Longer sentences should go to Obsidian.</div>
+  </section>
+
+  <section>
+    <h2 data-i18n="selectionPopup">Selection Popup</h2>
+    <div class="form-group">
+      <label for="selectionPopupFontSize" data-i18n="fontSize">Font Size</label>
+      <select id="selectionPopupFontSize">
+        <option value="13" data-i18n="fontSmall">Small</option>
+        <option value="15" data-i18n="fontMedium">Medium</option>
+        <option value="17" data-i18n="fontLarge">Large</option>
+        <option value="19" data-i18n="fontExtraLarge">Extra Large</option>
+      </select>
+    </div>
+  </section>
+
+  <div id="status"></div>
+
+  <div class="actions">
+    <button id="save" data-i18n="saveSettings">Save Settings</button>
+    <button id="reset" class="secondary" data-i18n="reset">Reset</button>
+  </div>
+
+  <section>
+    <label for="debugLog" style="font-size: 12px; color: #697586;" data-i18n="debugLog">Debug Log</label>
+    <textarea id="debugLog" readonly></textarea>
+  </section>
+
+  <script src="options.js"></script>
+</body>
+
+</html>

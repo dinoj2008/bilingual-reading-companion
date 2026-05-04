@@ -1,0 +1,61 @@
+{
+  "manifest_version": 3,
+  "name": "Bilingual Reading Companion",
+  "description": "LLM-powered bilingual reading, selection translation, and vocabulary capture for Obsidian and Eudic.",
+  "version": "0.6.9",
+  "permissions": [
+    "scripting",
+    "activeTab",
+    "tabs",
+    "contextMenus",
+    "storage"
+  ],
+  "host_permissions": [
+    "<all_urls>",
+    "http://*/*",
+    "https://*/*",
+    "http://127.0.0.1:5001/*",
+    "http://127.0.0.1:1234/*",
+    "http://localhost:1234/*",
+    "http://127.0.0.1:3000/*",
+    "http://localhost:3000/*",
+    "http://127.0.0.1:27123/*",
+    "http://localhost:27123/*",
+    "https://127.0.0.1:27124/*",
+    "https://localhost:27124/*",
+    "https://api.frdic.com/*"
+  ],
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "Translate page bilingually / 双语翻译页面",
+    "default_icon": {
+      "16": "icons/translator-v2-16.png",
+      "32": "icons/translator-v2-32.png",
+      "48": "icons/translator-v2-48.png",
+      "128": "icons/translator-v2-128.png"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "contentScript.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "icons": {
+    "16": "icons/translator-v2-16.png",
+    "32": "icons/translator-v2-32.png",
+    "48": "icons/translator-v2-48.png",
+    "128": "icons/translator-v2-128.png"
+  }
+}

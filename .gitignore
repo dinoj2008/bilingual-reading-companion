@@ -1,0 +1,13 @@
+.DS_Store
+*.zip
+*.log
+*.pem
+*.key
+.env
+.env.*
+node_modules/
+dist/
+build/
+release/
+tmp/
+*.local.*
