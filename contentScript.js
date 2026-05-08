@@ -13,6 +13,7 @@ const DEFAULT_UI_SETTINGS = {
   pronunciationAccent: "auto",
   floatingBallEnabled: true,
   floatingBallPosition: "right",
+  floatingBallTopPercent: 46,
   floatingBallOpacity: 82,
   floatingBallHoverOnly: false
 };
@@ -39,6 +40,8 @@ let selectionPopupDocClickHandler = null; // 点击页面关闭弹窗的监听�
 let floatingRoot = null;
 let floatingPanel = null;
 let floatingPanelDocClickHandler = null;
+let floatingDragState = null;
+let floatingSuppressNextClick = false;
 
 function log(...args) {
   console.log("[BilingualExt CS]", ...args);
@@ -66,6 +69,10 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
     };
     syncFloatingBall();
   }
+});
+
+window.addEventListener("resize", () => {
+  applyFloatingBallTop();
 });
 
 // ========== 工具函数 ==========
@@ -547,6 +554,115 @@ function destroyFloatingBall() {
   }
 }
 
+function clampFloatingTopPercent(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return DEFAULT_UI_SETTINGS.floatingBallTopPercent;
+  return Math.max(0, Math.min(100, number));
+}
+
+function getFloatingRootHeight() {
+  return floatingRoot?.offsetHeight || 92;
+}
+
+function getFloatingTopFromPercent(percent) {
+  const margin = 12;
+  const available = Math.max(1, window.innerHeight - getFloatingRootHeight() - margin * 2);
+  return Math.round(margin + available * clampFloatingTopPercent(percent) / 100);
+}
+
+function getFloatingPercentFromTop(topPx) {
+  const margin = 12;
+  const available = Math.max(1, window.innerHeight - getFloatingRootHeight() - margin * 2);
+  return clampFloatingTopPercent(((topPx - margin) / available) * 100);
+}
+
+function applyFloatingBallTop() {
+  if (!floatingRoot) return;
+  const top = getFloatingTopFromPercent(uiSettings.floatingBallTopPercent);
+  floatingRoot.style.setProperty("top", `${top}px`, "important");
+}
+
+function persistFloatingBallTop(percent) {
+  const nextPercent = clampFloatingTopPercent(percent);
+  uiSettings = {
+    ...uiSettings,
+    floatingBallTopPercent: nextPercent
+  };
+
+  chrome.storage.local.get({ ui: null }, (items) => {
+    const nextUi = {
+      ...(items.ui || {}),
+      floatingBallTopPercent: nextPercent
+    };
+    chrome.storage.local.set({ ui: nextUi });
+  });
+}
+
+function setupFloatingDrag(buttonStack) {
+  buttonStack.addEventListener("click", (event) => {
+    if (!floatingSuppressNextClick) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.stopImmediatePropagation();
+    floatingSuppressNextClick = false;
+  }, true);
+
+  buttonStack.addEventListener("pointerdown", (event) => {
+    if (event.button !== 0 || !floatingRoot) return;
+
+    const rect = floatingRoot.getBoundingClientRect();
+    floatingDragState = {
+      pointerId: event.pointerId,
+      startY: event.clientY,
+      startTop: rect.top,
+      currentTop: rect.top,
+      moved: false
+    };
+
+    buttonStack.setPointerCapture?.(event.pointerId);
+    floatingRoot.classList.add("bilingual-floating-dragging");
+  });
+
+  buttonStack.addEventListener("pointermove", (event) => {
+    if (!floatingDragState || event.pointerId !== floatingDragState.pointerId || !floatingRoot) return;
+
+    const deltaY = event.clientY - floatingDragState.startY;
+    if (Math.abs(deltaY) > 4) {
+      floatingDragState.moved = true;
+    }
+
+    if (!floatingDragState.moved) return;
+
+    const margin = 12;
+    const maxTop = Math.max(margin, window.innerHeight - getFloatingRootHeight() - margin);
+    const nextTop = Math.max(margin, Math.min(maxTop, floatingDragState.startTop + deltaY));
+
+    floatingDragState.currentTop = nextTop;
+    floatingRoot.style.setProperty("top", `${Math.round(nextTop)}px`, "important");
+    event.preventDefault();
+  });
+
+  const finishDrag = (event) => {
+    if (!floatingDragState || event.pointerId !== floatingDragState.pointerId) return;
+
+    buttonStack.releasePointerCapture?.(event.pointerId);
+    floatingRoot?.classList.remove("bilingual-floating-dragging");
+
+    if (floatingDragState.moved) {
+      floatingSuppressNextClick = true;
+      persistFloatingBallTop(getFloatingPercentFromTop(floatingDragState.currentTop));
+      setTimeout(() => {
+        floatingSuppressNextClick = false;
+      }, 250);
+    }
+
+    floatingDragState = null;
+  };
+
+  buttonStack.addEventListener("pointerup", finishDrag);
+  buttonStack.addEventListener("pointercancel", finishDrag);
+}
+
 function syncFloatingBall() {
   if (!document.body) {
     setTimeout(syncFloatingBall, 100);
@@ -566,6 +682,8 @@ function syncFloatingBall() {
 
     const buttonStack = document.createElement("div");
     buttonStack.className = "bilingual-floating-buttons";
+    buttonStack.title = "拖动可调整上下位置";
+    setupFloatingDrag(buttonStack);
 
     const quickBtn = document.createElement("button");
     quickBtn.type = "button";
@@ -601,6 +719,7 @@ function syncFloatingBall() {
   floatingRoot.classList.toggle("bilingual-floating-left", uiSettings.floatingBallPosition === "left");
   floatingRoot.classList.toggle("bilingual-floating-right", uiSettings.floatingBallPosition !== "left");
   floatingRoot.classList.toggle("bilingual-floating-hover-only", Boolean(uiSettings.floatingBallHoverOnly));
+  applyFloatingBallTop();
   floatingRoot.style.opacity = String(Math.max(20, Math.min(100, Number(uiSettings.floatingBallOpacity) || 82)) / 100);
 }
 
@@ -989,6 +1108,17 @@ function injectBilingualStyles() {
     .bilingual-floating-buttons {
       display: grid !important;
       gap: 8px !important;
+      cursor: grab !important;
+      touch-action: none !important;
+    }
+
+    #bilingual-floating-root.bilingual-floating-dragging {
+      transition: opacity 0.18s ease !important;
+    }
+
+    #bilingual-floating-root.bilingual-floating-dragging .bilingual-floating-buttons,
+    #bilingual-floating-root.bilingual-floating-dragging .bilingual-floating-ball {
+      cursor: grabbing !important;
     }
 
     .bilingual-floating-ball {

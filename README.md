@@ -16,6 +16,7 @@ This is not a general replacement for mature translation products such as Immers
 - Gemini native service support.
 - Separate service routing for full-page translation and selection translation.
 - Translation styles for news, general prose, literary writing, and academic text.
+- Page floating ball with vertical drag positioning.
 - Term-card capture to Obsidian with the selected term, Chinese meaning, English context, translated context, source link, review checklist, and Eudic deep link.
 - Passage-card capture to Obsidian.
 - Optional Eudic OpenAPI sync for short word or phrase selections.

@@ -32,6 +32,7 @@ const DEFAULT_UI = {
   pronunciationAccent: "auto",
   floatingBallEnabled: true,
   floatingBallPosition: "right",
+  floatingBallTopPercent: 46,
   floatingBallOpacity: 82,
   floatingBallHoverOnly: false
 };
@@ -114,7 +115,7 @@ const I18N = {
     accentUK: "British English",
     floatingBall: "Floating Ball",
     enableFloatingBall: "Show page floating ball",
-    floatingBallHint: "Shows a small page control for full-page translation, toggling translations, and quick model/style switching.",
+    floatingBallHint: "Shows a small page control for full-page translation, toggling translations, and quick model/style switching. Drag it up or down on the page to avoid site controls.",
     floatingBallPosition: "Position",
     positionRight: "Right",
     positionLeft: "Left",
@@ -219,7 +220,7 @@ const I18N = {
     accentUK: "英音",
     floatingBall: "页面悬浮球",
     enableFloatingBall: "显示页面悬浮球",
-    floatingBallHint: "在网页侧边显示一个小控制入口，用于全文翻译、隐藏/显示译文，以及快速切换模型和风格。",
+    floatingBallHint: "在网页侧边显示一个小控制入口，用于全文翻译、隐藏/显示译文，以及快速切换模型和风格。可在页面上上下拖动，避开网站自带控件。",
     floatingBallPosition: "位置",
     positionRight: "右侧",
     positionLeft: "左侧",
@@ -597,6 +598,8 @@ function populateUiForm() {
 }
 
 function readUiFromForm() {
+  const floatingBallTopPercent = Number(settings.ui.floatingBallTopPercent);
+
   return {
     selectionPopupFontSize: Number($("selectionPopupFontSize").value) || DEFAULT_UI.selectionPopupFontSize,
     optionsLanguage: $("optionsLanguage").value || DEFAULT_UI.optionsLanguage,
@@ -604,6 +607,7 @@ function readUiFromForm() {
     pronunciationAccent: ["auto", "us", "uk"].includes($("pronunciationAccent").value) ? $("pronunciationAccent").value : DEFAULT_UI.pronunciationAccent,
     floatingBallEnabled: $("floatingBallEnabled").checked,
     floatingBallPosition: $("floatingBallPosition").value === "left" ? "left" : "right",
+    floatingBallTopPercent: Math.max(0, Math.min(100, Number.isFinite(floatingBallTopPercent) ? floatingBallTopPercent : DEFAULT_UI.floatingBallTopPercent)),
     floatingBallOpacity: Math.max(20, Math.min(100, Number($("floatingBallOpacity").value) || DEFAULT_UI.floatingBallOpacity)),
     floatingBallHoverOnly: $("floatingBallHoverOnly").checked
   };

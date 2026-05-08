@@ -33,6 +33,7 @@ const DEFAULT_UI = {
   pronunciationAccent: "auto",
   floatingBallEnabled: true,
   floatingBallPosition: "right",
+  floatingBallTopPercent: 46,
   floatingBallOpacity: 82,
   floatingBallHoverOnly: false
 };
