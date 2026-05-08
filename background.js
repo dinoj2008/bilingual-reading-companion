@@ -29,6 +29,8 @@ const DEFAULT_CAPTURE = {
 
 const DEFAULT_UI = {
   selectionPopupFontSize: 15,
+  pronunciationEnabled: true,
+  pronunciationAccent: "auto",
   floatingBallEnabled: true,
   floatingBallPosition: "right",
   floatingBallOpacity: 82,
@@ -83,6 +85,9 @@ const MAX_TERM_CONTEXT_TRANSLATION_CHARS = 1200;
 const REQUEST_TIMEOUT_MS = 300000;
 const SELECTION_REQUEST_TIMEOUT_MS = 45000;
 const MAX_FALLBACK_MODELS = 4;
+const PRONUNCIATION_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const PRONUNCIATION_CACHE_MAX = 300;
+const pronunciationCache = new Map();
 
 function getSystemPrompt(promptProfileId) {
   const profile = PROMPT_PROFILES[promptProfileId] || PROMPT_PROFILES.news;
@@ -314,6 +319,160 @@ function persistSettings() {
       modelName: activeProvider?.modelName || ""
     }, resolve);
   });
+}
+
+function normalizeDictionaryWord(text) {
+  const clean = String(text || "")
+    .trim()
+    .replace(/^[^A-Za-z]+|[^A-Za-z]+$/g, "");
+
+  if (!/^[A-Za-z]+(?:[-'][A-Za-z]+)?$/.test(clean)) return "";
+  return clean.toLowerCase();
+}
+
+function normalizePronunciationAccent(accent) {
+  return ["auto", "us", "uk"].includes(accent) ? accent : "auto";
+}
+
+function getPronunciationCacheKey(word, accent) {
+  return `${normalizePronunciationAccent(accent)}:${word}`;
+}
+
+function getCachedPronunciation(key) {
+  const cached = pronunciationCache.get(key);
+  if (!cached) return null;
+
+  if (Date.now() - cached.time > PRONUNCIATION_CACHE_TTL_MS) {
+    pronunciationCache.delete(key);
+    return null;
+  }
+
+  return cached.value;
+}
+
+function setCachedPronunciation(key, value) {
+  pronunciationCache.delete(key);
+  pronunciationCache.set(key, {
+    value,
+    time: Date.now()
+  });
+
+  while (pronunciationCache.size > PRONUNCIATION_CACHE_MAX) {
+    const oldestKey = pronunciationCache.keys().next().value;
+    pronunciationCache.delete(oldestKey);
+  }
+}
+
+function normalizePhoneticText(text) {
+  const clean = String(text || "").trim();
+  if (!clean) return "";
+  if (clean.startsWith("/") && clean.endsWith("/")) return clean;
+  return `/${clean.replace(/^\/|\/$/g, "")}/`;
+}
+
+function normalizeAudioUrl(url) {
+  const clean = String(url || "").trim();
+  if (!clean) return "";
+  if (clean.startsWith("//")) return `https:${clean}`;
+  if (/^https?:\/\//i.test(clean)) return clean;
+  return "";
+}
+
+function detectPronunciationAccent(audioUrl) {
+  const lower = String(audioUrl || "").toLowerCase();
+  if (/(^|[_-])(us|am)([_-]|\d|\.)/.test(lower) || lower.includes("_us_")) return "us";
+  if (/(^|[_-])(gb|uk|br)([_-]|\d|\.)/.test(lower) || lower.includes("_gb_") || lower.includes("_uk_")) return "uk";
+  return "default";
+}
+
+function pickPreferredPhonetic(phonetics, accent) {
+  const normalizedAccent = normalizePronunciationAccent(accent);
+  const texts = phonetics
+    .map(item => normalizePhoneticText(item.text))
+    .filter(Boolean);
+
+  if (!texts.length) return "";
+
+  if (normalizedAccent === "us" || normalizedAccent === "uk") {
+    const preferred = phonetics.find(item => {
+      const audioUrl = normalizeAudioUrl(item.audio);
+      return detectPronunciationAccent(audioUrl) === normalizedAccent && normalizePhoneticText(item.text);
+    });
+    if (preferred) return normalizePhoneticText(preferred.text);
+  }
+
+  return texts[0];
+}
+
+function parseDictionaryPronunciation(entries, word, accent) {
+  const entryList = Array.isArray(entries) ? entries : [];
+  const phonetics = entryList.flatMap(entry => Array.isArray(entry?.phonetics) ? entry.phonetics : []);
+  const entryPhonetic = entryList.map(entry => normalizePhoneticText(entry?.phonetic)).find(Boolean);
+  const audio = {};
+  const fallbackAudio = [];
+
+  for (const phonetic of phonetics) {
+    const audioUrl = normalizeAudioUrl(phonetic?.audio);
+    if (!audioUrl) continue;
+
+    const audioAccent = detectPronunciationAccent(audioUrl);
+    if (audioAccent === "us" && !audio.us) {
+      audio.us = audioUrl;
+    } else if (audioAccent === "uk" && !audio.uk) {
+      audio.uk = audioUrl;
+    } else {
+      fallbackAudio.push(audioUrl);
+    }
+  }
+
+  audio.default = audio.default || fallbackAudio[0] || audio.us || audio.uk || "";
+
+  return {
+    word,
+    phonetic: pickPreferredPhonetic(phonetics, accent) || entryPhonetic,
+    audio,
+    source: "Free Dictionary API"
+  };
+}
+
+async function lookupPronunciation(text, accent = "auto") {
+  const word = normalizeDictionaryWord(text);
+  if (!word) {
+    return {
+      word: String(text || "").trim(),
+      phonetic: "",
+      audio: {},
+      source: ""
+    };
+  }
+
+  const normalizedAccent = normalizePronunciationAccent(accent);
+  const cacheKey = getPronunciationCacheKey(word, normalizedAccent);
+  const cached = getCachedPronunciation(cacheKey);
+  if (cached) return cached;
+
+  const url = `https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`;
+  const response = await fetch(url);
+
+  if (response.status === 404) {
+    const emptyPronunciation = {
+      word,
+      phonetic: "",
+      audio: {},
+      source: "Free Dictionary API"
+    };
+    setCachedPronunciation(cacheKey, emptyPronunciation);
+    return emptyPronunciation;
+  }
+
+  if (!response.ok) {
+    throw new Error(`Dictionary lookup failed: HTTP ${response.status}`);
+  }
+
+  const data = await response.json();
+  const pronunciation = parseDictionaryPronunciation(data, word, normalizedAccent);
+  setCachedPronunciation(cacheKey, pronunciation);
+  return pronunciation;
 }
 
 function buildAuthHeaders(apiKey) {
@@ -1040,6 +1199,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
+  if (message.type === "LOOKUP_PRONUNCIATION") {
+    lookupPronunciation(message.text, message.accent)
+      .then(pronunciation => sendResponse({ ok: true, pronunciation }))
+      .catch(err => sendResponse({ ok: false, error: err.message }));
+    return true;
+  }
+
   if (message.type === "CAPTURE_SELECTION") {
     captureSelection(message.payload || {}, {
       sourceTabId: sender?.tab?.id,
@@ -1407,6 +1573,7 @@ function buildObsidianEntry(payload) {
   const linkLine = pageUrl ? `[${escapeMarkdownLinkText(safeTitle)}](${pageUrl})` : safeTitle;
   const timestamp = formatLocalTimestamp();
   const contextTranslationBlock = getContextTranslationBlock(isTermCard, contextTranslation, translation, payload.contextTranslationError);
+  const phonetic = isTermCard ? getPayloadPhonetic(payload.pronunciation) : "";
   const lines = [
     "",
     "---",
@@ -1416,6 +1583,8 @@ function buildObsidianEntry(payload) {
     "### 中文解释",
     "",
     translation,
+    phonetic ? "" : null,
+    phonetic ? `音标：${phonetic}` : null,
     "",
     `### ${isTermCard ? "英文上下文" : "英文原文"}`,
     "",
@@ -1446,6 +1615,11 @@ function buildObsidianEntry(payload) {
   lines.push("", "#language-learning #browser-selection");
 
   return lines.join("\n");
+}
+
+function getPayloadPhonetic(pronunciation) {
+  if (!pronunciation || typeof pronunciation !== "object") return "";
+  return String(pronunciation.phonetic || "").trim();
 }
 
 function getContextTranslationBlock(isTermCard, contextTranslation, selectionTranslation, error) {

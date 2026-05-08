@@ -28,6 +28,8 @@ const DEFAULT_CAPTURE = {
 const DEFAULT_UI = {
   selectionPopupFontSize: 15,
   optionsLanguage: "auto",
+  pronunciationEnabled: true,
+  pronunciationAccent: "auto",
   floatingBallEnabled: true,
   floatingBallPosition: "right",
   floatingBallOpacity: 82,
@@ -103,6 +105,13 @@ const I18N = {
     fontMedium: "Medium",
     fontLarge: "Large",
     fontExtraLarge: "Extra Large",
+    pronunciation: "Pronunciation",
+    enablePronunciation: "Show pronunciation and audio for selected words",
+    pronunciationHint: "Single words use dictionary IPA and original audio when available. Phrases and fallback playback use your browser or system voice.",
+    pronunciationAccent: "Preferred Accent",
+    accentAuto: "Auto",
+    accentUS: "American English",
+    accentUK: "British English",
     floatingBall: "Floating Ball",
     enableFloatingBall: "Show page floating ball",
     floatingBallHint: "Shows a small page control for full-page translation, toggling translations, and quick model/style switching.",
@@ -201,6 +210,13 @@ const I18N = {
     fontMedium: "中",
     fontLarge: "大",
     fontExtraLarge: "超大",
+    pronunciation: "发音",
+    enablePronunciation: "为划词单词显示音标和发音",
+    pronunciationHint: "单词优先使用词典 IPA 和原始音频；短语和兜底播放会使用浏览器或系统语音。",
+    pronunciationAccent: "偏好口音",
+    accentAuto: "自动",
+    accentUS: "美音",
+    accentUK: "英音",
     floatingBall: "页面悬浮球",
     enableFloatingBall: "显示页面悬浮球",
     floatingBallHint: "在网页侧边显示一个小控制入口，用于全文翻译、隐藏/显示译文，以及快速切换模型和风格。",
@@ -572,6 +588,8 @@ function readCaptureFromForm() {
 function populateUiForm() {
   $("selectionPopupFontSize").value = String(settings.ui.selectionPopupFontSize || DEFAULT_UI.selectionPopupFontSize);
   $("optionsLanguage").value = settings.ui.optionsLanguage || DEFAULT_UI.optionsLanguage;
+  $("pronunciationEnabled").checked = settings.ui.pronunciationEnabled !== false;
+  $("pronunciationAccent").value = settings.ui.pronunciationAccent || DEFAULT_UI.pronunciationAccent;
   $("floatingBallEnabled").checked = Boolean(settings.ui.floatingBallEnabled ?? DEFAULT_UI.floatingBallEnabled);
   $("floatingBallPosition").value = settings.ui.floatingBallPosition || DEFAULT_UI.floatingBallPosition;
   $("floatingBallOpacity").value = String(settings.ui.floatingBallOpacity ?? DEFAULT_UI.floatingBallOpacity);
@@ -582,6 +600,8 @@ function readUiFromForm() {
   return {
     selectionPopupFontSize: Number($("selectionPopupFontSize").value) || DEFAULT_UI.selectionPopupFontSize,
     optionsLanguage: $("optionsLanguage").value || DEFAULT_UI.optionsLanguage,
+    pronunciationEnabled: $("pronunciationEnabled").checked,
+    pronunciationAccent: ["auto", "us", "uk"].includes($("pronunciationAccent").value) ? $("pronunciationAccent").value : DEFAULT_UI.pronunciationAccent,
     floatingBallEnabled: $("floatingBallEnabled").checked,
     floatingBallPosition: $("floatingBallPosition").value === "left" ? "left" : "right",
     floatingBallOpacity: Math.max(20, Math.min(100, Number($("floatingBallOpacity").value) || DEFAULT_UI.floatingBallOpacity)),

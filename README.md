@@ -10,6 +10,7 @@ This is not a general replacement for mature translation products such as Immers
 
 - Full-page bilingual translation with per-paragraph progress feedback.
 - Selection translation popup for words, phrases, sentences, and passages.
+- Word pronunciation controls with IPA lookup, dictionary audio when available, and system speech fallback.
 - Multiple translation services for local LLM endpoints and external APIs.
 - OpenAI-compatible services, such as Open WebUI, LM Studio, Ollama-compatible gateways, and similar chat-completion APIs.
 - Gemini native service support.
@@ -74,6 +75,7 @@ Longer sentence and passage selections are saved to Obsidian only.
 
 - API keys and sync credentials are stored in browser extension local storage.
 - Selected text and page text are sent to the LLM service you configure.
+- Selected single words may be queried through Free Dictionary API for IPA and pronunciation audio when pronunciation is enabled.
 - Eudic sync sends selected terms to Eudic OpenAPI when enabled.
 - Obsidian URI sync sends generated markdown content through the local `obsidian://` app link.
 - The repository does not include personal API keys, tokens, or vault paths.

@@ -9,6 +9,8 @@ const processedBlocks = new WeakSet();
 
 const DEFAULT_UI_SETTINGS = {
   selectionPopupFontSize: 15,
+  pronunciationEnabled: true,
+  pronunciationAccent: "auto",
   floatingBallEnabled: true,
   floatingBallPosition: "right",
   floatingBallOpacity: 82,
@@ -17,9 +19,12 @@ const DEFAULT_UI_SETTINGS = {
 
 const SELECTION_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 const SELECTION_CACHE_MAX = 80;
+const PRONUNCIATION_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const PRONUNCIATION_CACHE_MAX = 120;
 const PROMPT_PROFILE_ORDER = ["news", "general", "literary", "academic"];
 
 const selectionTranslationCache = new Map();
+const pronunciationCache = new Map();
 
 let uiSettings = { ...DEFAULT_UI_SETTINGS };
 let isPageTranslating = false;
@@ -413,6 +418,40 @@ function setCachedSelectionTranslation(key, value) {
   while (selectionTranslationCache.size > SELECTION_CACHE_MAX) {
     const oldestKey = selectionTranslationCache.keys().next().value;
     selectionTranslationCache.delete(oldestKey);
+  }
+}
+
+function getPronunciationCacheKey(text) {
+  return String(text || "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+function getCachedPronunciation(key) {
+  const cached = pronunciationCache.get(key);
+  if (!cached) return null;
+
+  if (Date.now() - cached.time > PRONUNCIATION_CACHE_TTL_MS) {
+    pronunciationCache.delete(key);
+    return null;
+  }
+
+  return cached.value;
+}
+
+function setCachedPronunciation(key, value) {
+  if (!key || !value) return;
+
+  pronunciationCache.delete(key);
+  pronunciationCache.set(key, {
+    value,
+    time: Date.now()
+  });
+
+  while (pronunciationCache.size > PRONUNCIATION_CACHE_MAX) {
+    const oldestKey = pronunciationCache.keys().next().value;
+    pronunciationCache.delete(oldestKey);
   }
 }
 
@@ -1184,6 +1223,7 @@ function captureSelectionForLearning(selectionMeta, translation, modelUsed) {
           sourceText: selectionMeta.text,
           contextText: selectionMeta.contextText,
           captureKind: selectionMeta.kind,
+          pronunciation: selectionMeta.pronunciation || null,
           translation,
           modelUsed,
           pageTitle: document.title || "",
@@ -1217,6 +1257,7 @@ function buildLearningCard(selectionMeta, translation, modelUsed) {
   const eudicLine = isShortTerm
     ? `- 欧路：[${escapeMarkdownLinkText(sourceText)}](eudic://dict/${encodeURIComponent(sourceText)})`
     : "";
+  const phonetic = isShortTerm ? String(selectionMeta.pronunciation?.phonetic || "").trim() : "";
 
   const lines = [
     "",
@@ -1227,6 +1268,8 @@ function buildLearningCard(selectionMeta, translation, modelUsed) {
     "### 中文解释",
     "",
     translation,
+    phonetic ? "" : null,
+    phonetic ? `音标：${phonetic}` : null,
     "",
     `### ${isShortTerm ? "英文上下文" : "英文原文"}`,
     "",
@@ -1553,6 +1596,225 @@ function removeSelectionPopup() {
   detachPopupDocClickHandler();
 }
 
+function isEnglishSelection(text) {
+  const clean = String(text || "").trim();
+  return /[A-Za-z]/.test(clean) && !/[\u4e00-\u9fff]/.test(clean);
+}
+
+function isSingleDictionaryWord(text) {
+  const clean = String(text || "")
+    .trim()
+    .replace(/^[^A-Za-z]+|[^A-Za-z]+$/g, "");
+  return /^[A-Za-z]+(?:[-'][A-Za-z]+)?$/.test(clean);
+}
+
+function normalizePronunciationAccent(accent) {
+  return ["auto", "us", "uk"].includes(accent) ? accent : "auto";
+}
+
+function getPreferredPronunciationAccent() {
+  return normalizePronunciationAccent(uiSettings.pronunciationAccent || "auto");
+}
+
+async function lookupPronunciationForSelection(text) {
+  const cacheKey = getPronunciationCacheKey(text);
+  const cached = getCachedPronunciation(cacheKey);
+  if (cached) return cached;
+
+  const response = await sendRuntimeMessage({
+    type: "LOOKUP_PRONUNCIATION",
+    text,
+    accent: getPreferredPronunciationAccent()
+  });
+  const pronunciation = response.pronunciation || null;
+  setCachedPronunciation(cacheKey, pronunciation);
+  return pronunciation;
+}
+
+function styleSelectionMiniButton(button) {
+  button.type = "button";
+  button.style.background = "transparent";
+  button.style.border = "1px solid rgba(255,255,255,0.4)";
+  button.style.color = "#fff";
+  button.style.borderRadius = "3px";
+  button.style.fontSize = "12px";
+  button.style.padding = "2px 6px";
+  button.style.cursor = "pointer";
+}
+
+function chooseSpeechVoice(accent) {
+  if (!("speechSynthesis" in window)) return null;
+
+  const voices = window.speechSynthesis.getVoices() || [];
+  const preferredLang = accent === "uk" ? "en-GB" : accent === "us" ? "en-US" : "";
+  const englishVoices = voices.filter(voice => /^en[-_]/i.test(voice.lang || ""));
+
+  if (preferredLang) {
+    return englishVoices.find(voice => voice.lang === preferredLang) ||
+      englishVoices.find(voice => voice.lang?.toLowerCase().startsWith(preferredLang.toLowerCase())) ||
+      null;
+  }
+
+  return englishVoices.find(voice => /^en-US/i.test(voice.lang || "")) ||
+    englishVoices.find(voice => /^en-GB/i.test(voice.lang || "")) ||
+    englishVoices[0] ||
+    null;
+}
+
+function speakWithSystemVoice(text, accent = "auto") {
+  if (!("speechSynthesis" in window) || !("SpeechSynthesisUtterance" in window)) {
+    return false;
+  }
+
+  const normalizedAccent = normalizePronunciationAccent(accent);
+  const utterance = new SpeechSynthesisUtterance(String(text || "").trim());
+  const voice = chooseSpeechVoice(normalizedAccent);
+  utterance.lang = normalizedAccent === "uk" ? "en-GB" : "en-US";
+  utterance.rate = 0.92;
+
+  if (voice) {
+    utterance.voice = voice;
+    utterance.lang = voice.lang || utterance.lang;
+  }
+
+  window.speechSynthesis.cancel();
+  window.speechSynthesis.speak(utterance);
+  return true;
+}
+
+function playDictionaryAudio(audioUrl, text, accent = "auto") {
+  if (!audioUrl) {
+    speakWithSystemVoice(text, accent);
+    return;
+  }
+
+  const audio = new Audio(audioUrl);
+  audio.preload = "auto";
+  audio.addEventListener("error", () => {
+    speakWithSystemVoice(text, accent);
+  }, { once: true });
+
+  const playResult = audio.play();
+  if (playResult && typeof playResult.catch === "function") {
+    playResult.catch(() => speakWithSystemVoice(text, accent));
+  }
+}
+
+function getPreferredAudioEntries(audio = {}, accent = "auto") {
+  const entries = [];
+  const add = (label, url, audioAccent) => {
+    if (!url || entries.some(item => item.url === url)) return;
+    entries.push({ label, url, accent: audioAccent });
+  };
+
+  if (accent === "us") {
+    add("美音", audio.us, "us");
+    add("英音", audio.uk, "uk");
+  } else if (accent === "uk") {
+    add("英音", audio.uk, "uk");
+    add("美音", audio.us, "us");
+  } else {
+    add("美音", audio.us, "us");
+    add("英音", audio.uk, "uk");
+  }
+
+  add("原音", audio.default, accent);
+  return entries;
+}
+
+function renderSpeechOnlyRow(row, text, label = "朗读") {
+  row.textContent = "";
+  const hint = document.createElement("span");
+  hint.textContent = "发音";
+  hint.style.opacity = "0.72";
+
+  const speakBtn = document.createElement("button");
+  speakBtn.textContent = label;
+  styleSelectionMiniButton(speakBtn);
+  speakBtn.addEventListener("click", (event) => {
+    event.stopPropagation();
+    speakWithSystemVoice(text, getPreferredPronunciationAccent());
+  });
+
+  row.appendChild(hint);
+  row.appendChild(speakBtn);
+}
+
+function renderPronunciationRow(row, text, pronunciation) {
+  row.textContent = "";
+  const preferredAccent = getPreferredPronunciationAccent();
+  const phonetic = pronunciation?.phonetic || "";
+  const audioEntries = getPreferredAudioEntries(pronunciation?.audio || {}, preferredAccent);
+
+  if (phonetic) {
+    const phoneticSpan = document.createElement("span");
+    phoneticSpan.textContent = phonetic;
+    phoneticSpan.style.fontFamily = "ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif";
+    phoneticSpan.style.opacity = "0.9";
+    row.appendChild(phoneticSpan);
+  } else {
+    const label = document.createElement("span");
+    label.textContent = "发音";
+    label.style.opacity = "0.72";
+    row.appendChild(label);
+  }
+
+  if (audioEntries.length) {
+    audioEntries.forEach(item => {
+      const button = document.createElement("button");
+      button.textContent = item.label;
+      styleSelectionMiniButton(button);
+      button.addEventListener("click", (event) => {
+        event.stopPropagation();
+        playDictionaryAudio(item.url, text, item.accent);
+      });
+      row.appendChild(button);
+    });
+  } else {
+    const speakBtn = document.createElement("button");
+    speakBtn.textContent = "朗读";
+    styleSelectionMiniButton(speakBtn);
+    speakBtn.addEventListener("click", (event) => {
+      event.stopPropagation();
+      speakWithSystemVoice(text, preferredAccent);
+    });
+    row.appendChild(speakBtn);
+  }
+}
+
+function attachPronunciationControls(row, selectionMeta) {
+  const text = selectionMeta.text;
+  if (uiSettings.pronunciationEnabled === false || selectionMeta.kind !== "term" || !isEnglishSelection(text)) {
+    row.remove();
+    return;
+  }
+
+  row.style.display = "flex";
+  row.style.alignItems = "center";
+  row.style.gap = "6px";
+  row.style.flexWrap = "wrap";
+  row.style.margin = "4px 0 6px";
+  row.style.fontSize = "12px";
+
+  if (!isSingleDictionaryWord(text)) {
+    renderSpeechOnlyRow(row, text);
+    return;
+  }
+
+  renderSpeechOnlyRow(row, text, "朗读");
+
+  lookupPronunciationForSelection(text)
+    .then(pronunciation => {
+      if (!row.isConnected || !pronunciation) return;
+      selectionMeta.pronunciation = pronunciation;
+      renderPronunciationRow(row, text, pronunciation);
+    })
+    .catch(err => {
+      log("Pronunciation lookup failed:", err);
+      if (row.isConnected) renderSpeechOnlyRow(row, text);
+    });
+}
+
 function createSelectionPopup(selectionMeta, zhText, rect, modelUsed = "", options = {}) {
   injectBilingualStyles();
   const enText = selectionMeta.text;
@@ -1752,6 +2014,9 @@ function createSelectionPopup(selectionMeta, zhText, rect, modelUsed = "", optio
   const enDiv = document.createElement("div");
   enDiv.textContent = enText;
 
+  const pronunciationRow = document.createElement("div");
+  attachPronunciationControls(pronunciationRow, selectionMeta);
+
   const hr = document.createElement("div");
   hr.style.borderTop = "1px solid rgba(255,255,255,0.2)";
   hr.style.margin = "4px 0";
@@ -1779,6 +2044,9 @@ function createSelectionPopup(selectionMeta, zhText, rect, modelUsed = "", optio
 
   popup.appendChild(header);
   popup.appendChild(enDiv);
+  if (pronunciationRow.isConnected || pronunciationRow.childNodes.length) {
+    popup.appendChild(pronunciationRow);
+  }
   popup.appendChild(hr);
   popup.appendChild(zhDiv);
 

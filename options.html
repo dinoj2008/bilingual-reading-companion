@@ -438,6 +438,23 @@
         <option value="19" data-i18n="fontExtraLarge">Extra Large</option>
       </select>
     </div>
+
+    <div class="check-row">
+      <input type="checkbox" id="pronunciationEnabled">
+      <label for="pronunciationEnabled" data-i18n="enablePronunciation">Show pronunciation and audio for selected words</label>
+    </div>
+
+    <div class="row">
+      <div class="form-group">
+        <label for="pronunciationAccent" data-i18n="pronunciationAccent">Preferred Accent</label>
+        <select id="pronunciationAccent">
+          <option value="auto" data-i18n="accentAuto">Auto</option>
+          <option value="us" data-i18n="accentUS">American English</option>
+          <option value="uk" data-i18n="accentUK">British English</option>
+        </select>
+      </div>
+    </div>
+    <div class="hint" data-i18n="pronunciationHint">Single words use dictionary IPA and original audio when available. Phrases and fallback playback use your browser or system voice.</div>
   </section>
 
   <section>

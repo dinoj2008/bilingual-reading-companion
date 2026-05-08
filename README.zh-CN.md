@@ -10,6 +10,7 @@
 
 - 全文双语翻译，带段落级等待状态和进度提示。
 - 划词、短语、句子、段落翻译弹窗。
+- 单词划词支持音标、词典原始音频，以及系统发音兜底。
 - 支持多个 LLM 翻译服务配置。
 - 支持 OpenAI-compatible API，例如 Open WebUI、LM Studio、Ollama 网关等。
 - 支持 Gemini Native API。
@@ -74,6 +75,7 @@ Local REST API 模式可以更安静，但需要额外安装 Obsidian REST 插�
 
 - API key 和同步凭证保存在浏览器扩展本地存储中。
 - 被翻译的选中文本和网页文本会发送给你配置的 LLM 翻译服务。
+- 开启发音功能时，单词可能会通过 Free Dictionary API 查询音标和发音音频。
 - 开启欧路同步时，选中的词或短语会发送给欧路 OpenAPI。
 - Obsidian URI 同步会通过本机 `obsidian://` app link 传递生成的 Markdown 内容。
 - 本仓库不包含个人 API key、token 或真实 vault 路径。
