@@ -11,10 +11,16 @@ const DEFAULT_UI_SETTINGS = {
   selectionPopupFontSize: 15
 };
 
+const SELECTION_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
+const SELECTION_CACHE_MAX = 80;
+
+const selectionTranslationCache = new Map();
+
 let uiSettings = { ...DEFAULT_UI_SETTINGS };
 let isPageTranslating = false;
 let pageTranslationHud = null;
 let bilingualStylesInjected = false;
+let bilingualTranslationsHidden = false;
 let selectionButton = null;           // 选区悬浮“译”按钮
 let selectionPopupHideTimer = null;   // 翻译弹窗自动隐藏计时器
 let selectionPopup = null;            // 当前弹窗 DOM
@@ -367,6 +373,57 @@ function sendPageTranslationStatus(payload) {
   });
 }
 
+function getSelectionCacheKey(text) {
+  return String(text || "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+function getCachedSelectionTranslation(key) {
+  const cached = selectionTranslationCache.get(key);
+  if (!cached) return null;
+
+  if (Date.now() - cached.time > SELECTION_CACHE_TTL_MS) {
+    selectionTranslationCache.delete(key);
+    return null;
+  }
+
+  return cached;
+}
+
+function setCachedSelectionTranslation(key, value) {
+  if (!key || !value?.translation) return;
+
+  selectionTranslationCache.set(key, {
+    ...value,
+    time: Date.now()
+  });
+
+  while (selectionTranslationCache.size > SELECTION_CACHE_MAX) {
+    const oldestKey = selectionTranslationCache.keys().next().value;
+    selectionTranslationCache.delete(oldestKey);
+  }
+}
+
+function toggleBilingualTranslations() {
+  injectBilingualStyles();
+  const blocks = Array.from(document.querySelectorAll(".bilingual-zh[data-bilingual-inserted='true']"));
+
+  if (!blocks.length) {
+    showTranslationToast("当前页面还没有译文");
+    return { hidden: bilingualTranslationsHidden, count: 0 };
+  }
+
+  bilingualTranslationsHidden = !bilingualTranslationsHidden;
+  blocks.forEach(block => {
+    block.style.display = bilingualTranslationsHidden ? "none" : "";
+  });
+
+  showTranslationToast(bilingualTranslationsHidden ? "已隐藏译文" : "已显示译文");
+  return { hidden: bilingualTranslationsHidden, count: blocks.length };
+}
+
 function injectBilingualStyles() {
   if (bilingualStylesInjected) return;
   bilingualStylesInjected = true;
@@ -566,6 +623,7 @@ function placeTranslationBlock(el, block) {
 function completeTranslationBlock(el, block, zh) {
   block.className = "bilingual-zh";
   block.textContent = zh.trim();
+  block.style.display = bilingualTranslationsHidden ? "none" : "";
   el.setAttribute("data-bilingual-processed", "true");
   el.removeAttribute("data-bilingual-processing");
   processedBlocks.add(el);
@@ -956,9 +1014,12 @@ function removeSelectionPopup() {
   detachPopupDocClickHandler();
 }
 
-function createSelectionPopup(selectionMeta, zhText, rect, modelUsed = "") {
+function createSelectionPopup(selectionMeta, zhText, rect, modelUsed = "", options = {}) {
+  injectBilingualStyles();
   const enText = selectionMeta.text;
   const saveLabel = selectionMeta.kind === "term" ? "收藏词卡" : "收藏段落";
+  const isLoading = options.state === "loading";
+  const isError = options.state === "error";
   // 移除旧 popup
   removeSelectionPopup();
 
@@ -1030,8 +1091,11 @@ function createSelectionPopup(selectionMeta, zhText, rect, modelUsed = "") {
   copyBothBtn.style.fontSize = "12px";
   copyBothBtn.style.padding = "2px 6px";
   copyBothBtn.style.cursor = "pointer";
+  copyBothBtn.disabled = isLoading || isError;
+  copyBothBtn.style.opacity = copyBothBtn.disabled ? "0.5" : "1";
   copyBothBtn.onclick = (e) => {
     e.stopPropagation();
+    if (copyBothBtn.disabled) return;
     const combined = `${enText}\n${zhText}`;
     copyToClipboard(combined);
   };
@@ -1046,8 +1110,11 @@ function createSelectionPopup(selectionMeta, zhText, rect, modelUsed = "") {
   copyBtn.style.fontSize = "12px";
   copyBtn.style.padding = "2px 6px";
   copyBtn.style.cursor = "pointer";
+  copyBtn.disabled = isLoading || isError;
+  copyBtn.style.opacity = copyBtn.disabled ? "0.5" : "1";
   copyBtn.onclick = (e) => {
     e.stopPropagation();
+    if (copyBtn.disabled) return;
     copyToClipboard(zhText);
   };
 
@@ -1060,8 +1127,11 @@ function createSelectionPopup(selectionMeta, zhText, rect, modelUsed = "") {
   copyCardBtn.style.fontSize = "12px";
   copyCardBtn.style.padding = "2px 6px";
   copyCardBtn.style.cursor = "pointer";
+  copyCardBtn.disabled = isLoading || isError;
+  copyCardBtn.style.opacity = copyCardBtn.disabled ? "0.5" : "1";
   copyCardBtn.onclick = (e) => {
     e.stopPropagation();
+    if (copyCardBtn.disabled) return;
     copyToClipboard(buildLearningCard(selectionMeta, zhText, modelUsed));
     copyCardBtn.textContent = "已复制";
     setTimeout(() => {
@@ -1078,8 +1148,11 @@ function createSelectionPopup(selectionMeta, zhText, rect, modelUsed = "") {
   saveBtn.style.fontSize = "12px";
   saveBtn.style.padding = "2px 6px";
   saveBtn.style.cursor = "pointer";
+  saveBtn.disabled = isLoading || isError;
+  saveBtn.style.opacity = saveBtn.disabled ? "0.5" : "1";
   saveBtn.onclick = async (e) => {
     e.stopPropagation();
+    if (saveBtn.disabled) return;
     saveBtn.disabled = true;
     saveBtn.textContent = selectionMeta.kind === "term" ? "翻译上下文" : "保存中";
     try {
@@ -1145,7 +1218,25 @@ function createSelectionPopup(selectionMeta, zhText, rect, modelUsed = "") {
   hr.style.margin = "4px 0";
 
   const zhDiv = document.createElement("div");
-  zhDiv.textContent = zhText;
+  if (isLoading) {
+    zhDiv.style.display = "flex";
+    zhDiv.style.alignItems = "center";
+    zhDiv.style.gap = "8px";
+
+    const spinner = document.createElement("span");
+    spinner.className = "bilingual-spinner";
+
+    const label = document.createElement("span");
+    label.textContent = zhText || "翻译中…";
+
+    zhDiv.appendChild(spinner);
+    zhDiv.appendChild(label);
+  } else {
+    zhDiv.textContent = zhText;
+    if (isError) {
+      zhDiv.style.color = "#fecaca";
+    }
+  }
 
   popup.appendChild(header);
   popup.appendChild(enDiv);
@@ -1189,19 +1280,32 @@ async function handleSelectionTranslate() {
 
   const range = selection.getRangeAt(0);
   const rect = range.getBoundingClientRect();
+  const cacheKey = getSelectionCacheKey(text);
+  const cached = getCachedSelectionTranslation(cacheKey);
 
   log("Translating selection, length:", text.length);
+  hideSelectionButton();
+
+  if (cached) {
+    createSelectionPopup(selectionMeta, cached.translation, rect, cached.modelUsed || "");
+    return;
+  }
+
+  createSelectionPopup(selectionMeta, "翻译中…", rect, "", { state: "loading" });
 
   try {
     const { translations, modelUsed } = await translateBatch([text], "selection");
     const zh = (translations[0] || "").trim();
     if (!zh) {
       log("Empty translation for selection.");
+      createSelectionPopup(selectionMeta, "翻译结果为空，请切换模型后重试", rect, "", { state: "error" });
       return;
     }
+    setCachedSelectionTranslation(cacheKey, { translation: zh, modelUsed });
     createSelectionPopup(selectionMeta, zh, rect, modelUsed);
   } catch (err) {
     log("Error translating selection:", err);
+    createSelectionPopup(selectionMeta, `翻译失败：${err.message || err}`, rect, "", { state: "error" });
   }
 }
 
@@ -1320,8 +1424,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   log("onMessage:", message?.type);
   if (message.type === "START_BILINGUAL_TRANSLATION") {
     makePageBilingual();
+    sendResponse({ ok: true });
   } else if (message.type === "CONTEXT_TRANSLATE_SELECTION") {
     // 右键菜单触发：选区翻译
     handleSelectionTranslate();
+    sendResponse({ ok: true });
+  } else if (message.type === "TOGGLE_BILINGUAL_TRANSLATIONS") {
+    const result = toggleBilingualTranslations();
+    sendResponse({ ok: true, ...result });
   }
+  return false;
 });

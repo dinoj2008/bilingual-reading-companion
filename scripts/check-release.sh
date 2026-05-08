@@ -8,6 +8,7 @@ echo "Checking JavaScript syntax..."
 node --check background.js
 node --check contentScript.js
 node --check options.js
+node --check popup.js
 
 echo "Checking manifest and icon paths..."
 node - <<'NODE'
@@ -26,6 +27,10 @@ for (const icon of icons) {
 
 if (manifest.name !== "Bilingual Reading Companion") {
   throw new Error(`Unexpected extension name: ${manifest.name}`);
+}
+
+if (!manifest.action?.default_popup || !fs.existsSync(manifest.action.default_popup)) {
+  throw new Error(`Missing popup: ${manifest.action?.default_popup || "(none)"}`);
 }
 
 console.log(`${manifest.name} ${manifest.version}`);

@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Bilingual Reading Companion</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --text: #172033;
+      --muted: #64748b;
+      --border: #d9e0ea;
+      --surface: #f7f9fc;
+      --primary: #2563eb;
+      --primary-dark: #1d4ed8;
+      --danger: #b42318;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      width: 340px;
+      margin: 0;
+      padding: 14px;
+      color: var(--text);
+      background: #fff;
+      font: 13px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      margin-bottom: 12px;
+    }
+
+    header img {
+      width: 28px;
+      height: 28px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 15px;
+      line-height: 1.2;
+    }
+
+    .muted {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .section {
+      padding: 10px 0;
+      border-top: 1px solid #edf1f6;
+    }
+
+    .section:first-of-type {
+      border-top: 0;
+      padding-top: 0;
+    }
+
+    .label {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 6px;
+      color: #334155;
+      font-weight: 700;
+    }
+
+    select,
+    button {
+      width: 100%;
+      min-height: 34px;
+      border-radius: 6px;
+      font: inherit;
+    }
+
+    select {
+      padding: 7px 8px;
+      border: 1px solid var(--border);
+      color: var(--text);
+      background: #fff;
+    }
+
+    button {
+      border: 0;
+      color: #fff;
+      background: var(--primary);
+      cursor: pointer;
+      font-weight: 700;
+    }
+
+    button:hover {
+      background: var(--primary-dark);
+    }
+
+    button.secondary {
+      color: #172033;
+      background: var(--surface);
+      border: 1px solid var(--border);
+    }
+
+    button.secondary:hover {
+      background: #eef3f8;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .stack {
+      display: grid;
+      gap: 8px;
+    }
+
+    .status {
+      min-height: 18px;
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .status.error {
+      color: var(--danger);
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <img src="icons/translator-v2-32.png" alt="">
+    <div>
+      <h1>双语阅读伴侣</h1>
+      <div class="muted">Bilingual Reading Companion</div>
+    </div>
+  </header>
+
+  <div class="section stack">
+    <button id="translatePage">全文翻译</button>
+    <button id="toggleTranslations" class="secondary">隐藏/显示译文</button>
+  </div>
+
+  <div class="section stack">
+    <div>
+      <div class="label">
+        <span>全文模型</span>
+        <span id="pageProviderType" class="muted"></span>
+      </div>
+      <select id="pageProvider"></select>
+    </div>
+    <select id="pageModel"></select>
+  </div>
+
+  <div class="section stack">
+    <div>
+      <div class="label">
+        <span>划词模型</span>
+        <span id="selectionProviderType" class="muted"></span>
+      </div>
+      <select id="selectionProvider"></select>
+    </div>
+    <select id="selectionModel"></select>
+  </div>
+
+  <div class="section stack">
+    <div class="label">
+      <span>翻译风格</span>
+    </div>
+    <select id="promptProfile"></select>
+  </div>
+
+  <div class="section row">
+    <button id="openOptions" class="secondary">打开设置</button>
+    <button id="refreshState" class="secondary">刷新</button>
+  </div>
+
+  <div id="status" class="status">正在读取设置…</div>
+
+  <script src="popup.js"></script>
+</body>
+
+</html>

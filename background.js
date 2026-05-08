@@ -77,6 +77,8 @@ const SAFETY_RATIO = 0.7;
 const MAX_CHARS_PER_BLOCK = 2000;
 const MAX_TERM_CONTEXT_TRANSLATION_CHARS = 1200;
 const REQUEST_TIMEOUT_MS = 300000;
+const SELECTION_REQUEST_TIMEOUT_MS = 45000;
+const MAX_FALLBACK_MODELS = 4;
 
 function getSystemPrompt(promptProfileId) {
   const profile = PROMPT_PROFILES[promptProfileId] || PROMPT_PROFILES.news;
@@ -87,6 +89,40 @@ function getSystemPrompt(promptProfileId) {
     "You must output a valid JSON object where keys are the paragraph IDs and values are the translations.",
     "Do not include explanations, markdown formatting, or extra text outside the JSON."
   ].join(" ");
+}
+
+function isShortSelection(text) {
+  const clean = String(text || "").trim();
+  if (!clean) return false;
+  const words = clean.match(/[A-Za-z]+(?:[-'][A-Za-z]+)*/g) || [];
+  return clean.length <= 80 && words.length <= 8 && !/[.!?。！？]\s*$/.test(clean);
+}
+
+function getSelectionSystemPrompt(promptProfileId, text = "") {
+  if (isShortSelection(text)) {
+    return [
+      "Translate the English word or short phrase into concise Simplified Chinese meanings.",
+      "Output only Chinese meanings separated by /.",
+      "No explanations, labels, markdown, examples, or quotation marks."
+    ].join(" ");
+  }
+
+  const profile = PROMPT_PROFILES[promptProfileId] || PROMPT_PROFILES.news;
+  return [
+    "You are a concise English-to-Simplified-Chinese translation assistant.",
+    "Translate the selected English text into Simplified Chinese.",
+    profile.instruction,
+    "If the input is a single word or short phrase, return only concise Chinese meanings separated by /.",
+    "If the input is a sentence or paragraph, return a faithful Chinese translation.",
+    "Do not include explanations, markdown, quotation marks, or extra labels."
+  ].join(" ");
+}
+
+function getSelectionMaxOutputTokens(text) {
+  const clean = String(text || "").trim();
+  if (isShortSelection(clean)) return 96;
+  if (clean.length <= 320) return 256;
+  return 512;
 }
 
 const USER_PROMPT_TEMPLATE = (jsonStr) => `
@@ -228,6 +264,51 @@ function getProviderForUseCase(useCase, explicitProviderId) {
   if (useCase === "selection") return getProviderById(settings.selectionProviderId);
   if (useCase === "page") return getProviderById(settings.pageProviderId);
   return getProviderById(settings.activeProviderId);
+}
+
+function getPromptProfileSummaries() {
+  return Object.fromEntries(
+    Object.entries(PROMPT_PROFILES).map(([id, profile]) => [id, { label: profile.label }])
+  );
+}
+
+function getPublicProviderSummary(provider) {
+  return {
+    id: provider.id,
+    name: provider.name,
+    providerType: provider.providerType,
+    modelName: provider.modelName,
+    models: Array.isArray(provider.models) ? provider.models : []
+  };
+}
+
+function getRuntimeState() {
+  return {
+    providerProfiles: settings.providerProfiles.map(getPublicProviderSummary),
+    activeProviderId: settings.activeProviderId,
+    pageProviderId: settings.pageProviderId,
+    selectionProviderId: settings.selectionProviderId,
+    translation: settings.translation,
+    promptProfiles: getPromptProfileSummaries()
+  };
+}
+
+function persistSettings() {
+  const activeProvider = getProviderById(settings.activeProviderId);
+  return new Promise((resolve) => {
+    chrome.storage.local.set({
+      providerProfiles: settings.providerProfiles,
+      activeProviderId: settings.activeProviderId,
+      pageProviderId: settings.pageProviderId,
+      selectionProviderId: settings.selectionProviderId,
+      capture: settings.capture,
+      ui: settings.ui,
+      translation: settings.translation,
+      apiUrl: activeProvider?.apiUrl || "",
+      apiKey: activeProvider?.apiKey || "",
+      modelName: activeProvider?.modelName || ""
+    }, resolve);
+  });
 }
 
 function buildAuthHeaders(apiKey) {
@@ -382,6 +463,113 @@ async function callGeminiLLM(textsSublist, provider, promptProfileId) {
   }
 }
 
+async function callSelectionLLM(text, provider, promptProfileId) {
+  if (provider.providerType === "gemini") {
+    return callGeminiSelectionLLM(text, provider, promptProfileId);
+  }
+
+  return callOpenAICompatibleSelectionLLM(text, provider, promptProfileId);
+}
+
+async function callOpenAICompatibleSelectionLLM(text, provider, promptProfileId) {
+  const payload = {
+    model: provider.modelName,
+    messages: [
+      { role: "system", content: getSelectionSystemPrompt(promptProfileId, text) },
+      { role: "user", content: text }
+    ],
+    temperature: 0.1,
+    top_p: 0.8,
+    max_tokens: getSelectionMaxOutputTokens(text)
+  };
+
+  log(`Sending selection request to ${provider.apiUrl}...`);
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), SELECTION_REQUEST_TIMEOUT_MS);
+
+  try {
+    const resp = await fetch(provider.apiUrl, {
+      method: "POST",
+      headers: buildAuthHeaders(provider.apiKey),
+      body: JSON.stringify(payload),
+      signal: controller.signal
+    });
+
+    if (!resp.ok) {
+      const errText = await resp.text();
+      throw new Error(`API Error ${resp.status}: ${errText}`);
+    }
+
+    const data = await resp.json();
+    return {
+      text: String(data.choices?.[0]?.message?.content || "").trim(),
+      model: data.model || provider.modelName
+    };
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+async function callGeminiSelectionLLM(text, provider, promptProfileId) {
+  if (!provider.apiKey || !provider.apiKey.trim()) {
+    throw new Error("Gemini API key is required.");
+  }
+
+  const thinkingConfig = buildGeminiThinkingConfig(provider.modelName, { fastSelection: true });
+  const payload = {
+    systemInstruction: {
+      parts: [{ text: getSelectionSystemPrompt(promptProfileId, text) }]
+    },
+    contents: [
+      {
+        role: "user",
+        parts: [{ text }]
+      }
+    ],
+    generationConfig: {
+      temperature: 0.1,
+      topP: 0.8,
+      maxOutputTokens: getSelectionMaxOutputTokens(text)
+    }
+  };
+
+  if (thinkingConfig) {
+    payload.generationConfig.thinkingConfig = thinkingConfig;
+  }
+
+  const url = buildGeminiGenerateUrl(provider);
+  log(`Sending Gemini selection request to ${url}...`);
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), SELECTION_REQUEST_TIMEOUT_MS);
+
+  try {
+    const resp = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": provider.apiKey.trim()
+      },
+      body: JSON.stringify(payload),
+      signal: controller.signal
+    });
+
+    if (!resp.ok) {
+      const errText = await resp.text();
+      throw new Error(`Gemini API Error ${resp.status}: ${errText}`);
+    }
+
+    const data = await resp.json();
+    return {
+      text: extractGeminiText(data).trim(),
+      model: data.modelVersion || provider.modelName
+    };
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 function parseTranslationResponse(content, expectedCount) {
   const firstBrace = content.indexOf("{");
   const lastBrace = content.lastIndexOf("}");
@@ -496,11 +684,11 @@ function normalizeGeminiModelName(modelName) {
     .replace(/:generateContent$/, "");
 }
 
-function buildGeminiThinkingConfig(modelName) {
+function buildGeminiThinkingConfig(modelName, options = {}) {
   const model = normalizeGeminiModelName(modelName).toLowerCase();
 
   if (model.includes("gemini-3") && model.includes("flash")) {
-    return { thinkingLevel: "minimal" };
+    return { thinkingLevel: options.fastSelection ? "minimal" : "low" };
   }
 
   if (model.includes("gemini-3")) {
@@ -547,6 +735,82 @@ async function translateSubTexts(subTexts, provider, promptProfileId) {
   };
 }
 
+function getProviderFallbackCandidates(provider) {
+  if (!provider) return [];
+
+  const candidates = [provider];
+  const seenModels = new Set([String(provider.modelName || "").trim()]);
+  const configuredModels = Array.isArray(provider.models) ? provider.models : [];
+
+  for (const modelName of configuredModels) {
+    const cleanModel = String(modelName || "").trim();
+    if (!cleanModel || seenModels.has(cleanModel)) continue;
+
+    seenModels.add(cleanModel);
+    candidates.push({
+      ...provider,
+      modelName: cleanModel
+    });
+
+    if (candidates.length >= MAX_FALLBACK_MODELS) break;
+  }
+
+  return candidates;
+}
+
+function isRetryableProviderError(err) {
+  const message = String(err?.message || err || "").toLowerCase();
+  return /429|503|500|502|504|quota|rate|limit|overload|overloaded|resource_exhausted|unavailable|timeout|abort|deadline|busy/.test(message);
+}
+
+async function translateSubTextsWithFallback(subTexts, providers, promptProfileId) {
+  let lastError = null;
+
+  for (let i = 0; i < providers.length; i++) {
+    const provider = providers[i];
+    try {
+      if (i > 0) {
+        log(`Retrying translation with fallback model: ${provider.modelName}`);
+      }
+      return await translateSubTexts(subTexts, provider, promptProfileId);
+    } catch (err) {
+      lastError = err;
+      if (i >= providers.length - 1 || !isRetryableProviderError(err)) {
+        throw err;
+      }
+      log(`Provider/model failed, trying next fallback: ${err.message}`);
+    }
+  }
+
+  throw lastError || new Error("Translation failed.");
+}
+
+async function translateSelectionTextWithFallback(text, providers, promptProfileId) {
+  let lastError = null;
+
+  for (let i = 0; i < providers.length; i++) {
+    const provider = providers[i];
+    try {
+      if (i > 0) {
+        log(`Retrying selection translation with fallback model: ${provider.modelName}`);
+      }
+      const result = await callSelectionLLM(text, provider, promptProfileId);
+      if (!result.text) {
+        throw new Error("Empty selection translation.");
+      }
+      return result;
+    } catch (err) {
+      lastError = err;
+      if (i >= providers.length - 1 || !isRetryableProviderError(err)) {
+        throw err;
+      }
+      log(`Selection provider/model failed, trying next fallback: ${err.message}`);
+    }
+  }
+
+  throw lastError || new Error("Selection translation failed.");
+}
+
 async function translateBatch(texts, options = {}) {
   await ensureConfigReady();
   const provider = getProviderForUseCase(options.useCase, options.providerId);
@@ -564,6 +828,16 @@ async function translateBatch(texts, options = {}) {
     }
     return s;
   });
+
+  const fallbackProviders = getProviderFallbackCandidates(provider);
+
+  if (options.useCase === "selection" && cleanedTexts.length === 1) {
+    const result = await translateSelectionTextWithFallback(cleanedTexts[0], fallbackProviders, promptProfileId);
+    return {
+      translations: [result.text],
+      modelUsed: result.model
+    };
+  }
 
   const maxPromptTokens = Math.floor(CONTEXT_TOKENS * SAFETY_RATIO);
   const baseTokens = estimateTokens(getSystemPrompt(promptProfileId)) + estimateTokens(USER_PROMPT_TEMPLATE("{}"));
@@ -598,7 +872,7 @@ async function translateBatch(texts, options = {}) {
     }
 
     try {
-      const { results: subTranslations, model } = await translateSubTexts(subTexts, provider, promptProfileId);
+      const { results: subTranslations, model } = await translateSubTextsWithFallback(subTexts, fallbackProviders, promptProfileId);
       lastModelUsed = model || lastModelUsed;
 
       subIndices.forEach((pos, j) => {
@@ -656,6 +930,80 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   log("onMessage:", message?.type, "from", sender?.tab ? `tab ${sender.tab.id}` : "extension");
+
+  if (message.type === "GET_POPUP_STATE") {
+    ensureConfigReady()
+      .then(() => sendResponse({ ok: true, state: getRuntimeState() }))
+      .catch(err => sendResponse({ ok: false, error: err.message }));
+    return true;
+  }
+
+  if (message.type === "SET_PROVIDER_FOR_USE_CASE") {
+    ensureConfigReady()
+      .then(async () => {
+        const providerId = String(message.providerId || "");
+        if (!settings.providerProfiles.some(provider => provider.id === providerId)) {
+          throw new Error("Unknown provider.");
+        }
+
+        if (message.useCase === "selection") {
+          settings.selectionProviderId = providerId;
+        } else {
+          settings.pageProviderId = providerId;
+        }
+
+        settings.activeProviderId = providerId;
+        await persistSettings();
+        sendResponse({ ok: true, state: getRuntimeState() });
+      })
+      .catch(err => sendResponse({ ok: false, error: err.message }));
+    return true;
+  }
+
+  if (message.type === "SET_PROVIDER_MODEL") {
+    ensureConfigReady()
+      .then(async () => {
+        const providerId = String(message.providerId || "");
+        const modelName = String(message.modelName || "").trim();
+        const provider = settings.providerProfiles.find(item => item.id === providerId);
+
+        if (!provider) throw new Error("Unknown provider.");
+        if (!modelName) throw new Error("Model name is required.");
+
+        provider.modelName = modelName;
+        if (message.useCase === "selection") {
+          settings.selectionProviderId = providerId;
+        } else {
+          settings.pageProviderId = providerId;
+        }
+        settings.activeProviderId = providerId;
+
+        await persistSettings();
+        sendResponse({ ok: true, state: getRuntimeState() });
+      })
+      .catch(err => sendResponse({ ok: false, error: err.message }));
+    return true;
+  }
+
+  if (message.type === "SET_PROMPT_PROFILE") {
+    ensureConfigReady()
+      .then(async () => {
+        const promptProfile = String(message.promptProfile || DEFAULT_TRANSLATION.promptProfile);
+        if (!PROMPT_PROFILES[promptProfile]) {
+          throw new Error("Unknown translation style.");
+        }
+
+        settings.translation = {
+          ...settings.translation,
+          promptProfile
+        };
+
+        await persistSettings();
+        sendResponse({ ok: true, state: getRuntimeState() });
+      })
+      .catch(err => sendResponse({ ok: false, error: err.message }));
+    return true;
+  }
 
   if (message.type === "TRANSLATE_BATCH") {
     translateBatch(message.payload, {
