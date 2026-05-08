@@ -1684,19 +1684,18 @@ function speakWithSystemVoice(text, accent = "auto") {
 
 function playDictionaryAudio(audioUrl, text, accent = "auto") {
   if (!audioUrl) {
-    speakWithSystemVoice(text, accent);
     return;
   }
 
   const audio = new Audio(audioUrl);
   audio.preload = "auto";
   audio.addEventListener("error", () => {
-    speakWithSystemVoice(text, accent);
+    showTranslationToast("词典音频播放失败");
   }, { once: true });
 
   const playResult = audio.play();
   if (playResult && typeof playResult.catch === "function") {
-    playResult.catch(() => speakWithSystemVoice(text, accent));
+    playResult.catch(() => showTranslationToast("词典音频播放失败"));
   }
 }
 
@@ -1718,11 +1717,22 @@ function getPreferredAudioEntries(audio = {}, accent = "auto") {
     add("英音", audio.uk, "uk");
   }
 
-  add("原音", audio.default, accent);
+  if (!entries.length) {
+    add("词典音频", audio.default, accent);
+  }
+
   return entries;
 }
 
-function renderSpeechOnlyRow(row, text, label = "朗读") {
+function renderPronunciationLoadingRow(row) {
+  row.textContent = "";
+  const hint = document.createElement("span");
+  hint.textContent = "查找发音…";
+  hint.style.opacity = "0.72";
+  row.appendChild(hint);
+}
+
+function renderSpeechOnlyRow(row, text, label = "系统朗读") {
   row.textContent = "";
   const hint = document.createElement("span");
   hint.textContent = "发音";
@@ -1746,6 +1756,11 @@ function renderPronunciationRow(row, text, pronunciation) {
   const phonetic = pronunciation?.phonetic || "";
   const audioEntries = getPreferredAudioEntries(pronunciation?.audio || {}, preferredAccent);
 
+  if (!phonetic && !audioEntries.length) {
+    row.remove();
+    return;
+  }
+
   if (phonetic) {
     const phoneticSpan = document.createElement("span");
     phoneticSpan.textContent = phonetic;
@@ -1759,27 +1774,16 @@ function renderPronunciationRow(row, text, pronunciation) {
     row.appendChild(label);
   }
 
-  if (audioEntries.length) {
-    audioEntries.forEach(item => {
-      const button = document.createElement("button");
-      button.textContent = item.label;
-      styleSelectionMiniButton(button);
-      button.addEventListener("click", (event) => {
-        event.stopPropagation();
-        playDictionaryAudio(item.url, text, item.accent);
-      });
-      row.appendChild(button);
-    });
-  } else {
-    const speakBtn = document.createElement("button");
-    speakBtn.textContent = "朗读";
-    styleSelectionMiniButton(speakBtn);
-    speakBtn.addEventListener("click", (event) => {
+  audioEntries.forEach(item => {
+    const button = document.createElement("button");
+    button.textContent = item.label;
+    styleSelectionMiniButton(button);
+    button.addEventListener("click", (event) => {
       event.stopPropagation();
-      speakWithSystemVoice(text, preferredAccent);
+      playDictionaryAudio(item.url, text, item.accent);
     });
-    row.appendChild(speakBtn);
-  }
+    row.appendChild(button);
+  });
 }
 
 function attachPronunciationControls(row, selectionMeta) {
@@ -1801,7 +1805,7 @@ function attachPronunciationControls(row, selectionMeta) {
     return;
   }
 
-  renderSpeechOnlyRow(row, text, "朗读");
+  renderPronunciationLoadingRow(row);
 
   lookupPronunciationForSelection(text)
     .then(pronunciation => {
@@ -1811,7 +1815,7 @@ function attachPronunciationControls(row, selectionMeta) {
     })
     .catch(err => {
       log("Pronunciation lookup failed:", err);
-      if (row.isConnected) renderSpeechOnlyRow(row, text);
+      if (row.isConnected) row.remove();
     });
 }
 
