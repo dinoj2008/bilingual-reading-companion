@@ -279,20 +279,21 @@
   </header>
 
   <section>
-    <h2 data-i18n="providerProfiles">Provider Profiles</h2>
+    <h2 data-i18n="providerProfiles">Translation Services</h2>
     <div class="toolbar">
       <select id="providerSelect"></select>
-      <button id="addProvider" class="secondary" data-i18n="newProvider">New</button>
+      <button id="addProvider" class="secondary" data-i18n="newProvider">New Service</button>
+      <button id="saveProvider" data-i18n="saveProvider">Save Service</button>
       <button id="deleteProvider" class="danger" data-i18n="deleteProvider">Delete</button>
     </div>
 
     <div class="form-group">
-      <label for="providerName" data-i18n="profileName">Profile Name</label>
-      <input type="text" id="providerName" placeholder="Mac Mini Open WebUI" data-i18n-placeholder="profileNamePlaceholder">
+      <label for="providerName" data-i18n="profileName">Service Name</label>
+      <input type="text" id="providerName" placeholder="Gemini API" data-i18n-placeholder="profileNamePlaceholder">
     </div>
 
     <div class="form-group">
-      <label for="providerType" data-i18n="providerType">Provider Type</label>
+      <label for="providerType" data-i18n="providerType">Service Type</label>
       <select id="providerType">
         <option value="openai">OpenAI Compatible</option>
         <option value="gemini">Gemini Native</option>
@@ -323,14 +324,14 @@
   </section>
 
   <section>
-    <h2 data-i18n="translationRouting">Translation Routing</h2>
+    <h2 data-i18n="translationRouting">Use Services For</h2>
     <div class="row">
       <div class="form-group">
-        <label for="pageProviderSelect" data-i18n="fullPage">Full Page</label>
+        <label for="pageProviderSelect" data-i18n="fullPage">Full Page Uses</label>
         <select id="pageProviderSelect"></select>
       </div>
       <div class="form-group">
-        <label for="selectionProviderSelect" data-i18n="selection">Selection</label>
+        <label for="selectionProviderSelect" data-i18n="selection">Selection Uses</label>
         <select id="selectionProviderSelect"></select>
       </div>
     </div>

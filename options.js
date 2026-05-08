@@ -45,12 +45,14 @@ const I18N = {
     languageAuto: "Auto",
     languageEnglish: "English",
     languageChinese: "中文",
-    providerProfiles: "Provider Profiles",
-    newProvider: "New",
+    providerProfiles: "Translation Services",
+    providerSelectPlaceholder: "Select a saved service",
+    newProvider: "New Service",
+    saveProvider: "Save Service",
     deleteProvider: "Delete",
-    profileName: "Profile Name",
-    profileNamePlaceholder: "Mac Mini Open WebUI",
-    providerType: "Provider Type",
+    profileName: "Service Name",
+    profileNamePlaceholder: "Gemini API",
+    providerType: "Service Type",
     apiUrl: "API URL",
     apiUrlHintOpenai: "Supports Open WebUI, LM Studio, and most OpenAI-compatible chat completion APIs.",
     apiUrlHintGemini: "Use the Gemini API base URL. The extension will call /models and /models/{model}:generateContent for you.",
@@ -62,9 +64,9 @@ const I18N = {
     modelHint: "Load models to pick from a list, or type a custom model name.",
     modelSelectEmpty: "Load models, or type below",
     customModelSuffix: "(custom)",
-    translationRouting: "Translation Routing",
-    fullPage: "Full Page",
-    selection: "Selection",
+    translationRouting: "Use Services For",
+    fullPage: "Full Page Uses",
+    selection: "Selection Uses",
     translationStyle: "Translation Style",
     styleNews: "News / faithful reporting",
     styleGeneral: "General / natural Chinese",
@@ -112,22 +114,27 @@ const I18N = {
     saveSettings: "Save Settings",
     reset: "Reset",
     debugLog: "Debug Log",
-    unnamedProvider: "Unnamed Provider",
-    newProviderProfileName: "New Provider",
-    migratedLocalProvider: "Migrated Local Provider",
+    unnamedProvider: "Unnamed Service",
+    newProviderProfileName: "New Service",
+    draftProviderName: "Unsaved service draft",
+    defaultGeminiServiceName: "Gemini API",
+    defaultLocalServiceName: "Local LLM",
+    migratedLocalProvider: "Migrated Local Service",
     apiUrlRequired: "Error: API URL cannot be empty.",
+    modelNameRequired: "Error: model name cannot be empty.",
     settingsSaved: "Settings saved.",
     restoredDefaults: "Restored defaults. Click Save to apply.",
-    newProviderCreated: "New provider created. Fill in its details and save.",
-    atLeastOneProvider: "At least one provider is required.",
-    providerDeleted: "Provider deleted. Click Save to apply.",
+    newProviderCreated: "New service draft created. Fill it in, then click Save Service.",
+    atLeastOneProvider: "At least one service is required.",
+    providerDeleted: "Service deleted. Click Save Settings to apply.",
+    providerSaved: "Service saved.",
     setApiUrlFirst: "Please set API URL first.",
     fetchingModels: "Fetching models...",
     failed: "Failed: {error}",
     runtimeError: "Runtime Error: {error}",
     backgroundFetchFailed: "Background fetch failed: {error}",
     loadedModels: "Loaded {count} model(s).",
-    loadedProfiles: "Loaded {count} provider profile(s).",
+    loadedProfiles: "Loaded {count} service(s).",
     debugFetchingModels: "Fetching models for {name}: {url}"
   },
   "zh-CN": {
@@ -136,12 +143,14 @@ const I18N = {
     languageAuto: "自动",
     languageEnglish: "English",
     languageChinese: "中文",
-    providerProfiles: "Provider 配置",
-    newProvider: "新建",
+    providerProfiles: "翻译服务",
+    providerSelectPlaceholder: "选择已保存服务",
+    newProvider: "新建服务",
+    saveProvider: "保存服务",
     deleteProvider: "删除",
-    profileName: "配置名称",
-    profileNamePlaceholder: "Mac Mini Open WebUI",
-    providerType: "Provider 类型",
+    profileName: "服务名称",
+    profileNamePlaceholder: "Gemini API",
+    providerType: "服务类型",
     apiUrl: "API 地址",
     apiUrlHintOpenai: "支持 Open WebUI、LM Studio，以及大多数 OpenAI-compatible chat completion API。",
     apiUrlHintGemini: "使用 Gemini API base URL。扩展会自动调用 /models 和 /models/{model}:generateContent。",
@@ -153,9 +162,9 @@ const I18N = {
     modelHint: "可以先加载模型列表选择，也可以手动输入模型名称。",
     modelSelectEmpty: "加载模型，或在下方手动填写",
     customModelSuffix: "（自定义）",
-    translationRouting: "翻译路由",
-    fullPage: "全文翻译",
-    selection: "划词翻译",
+    translationRouting: "不同场景使用的服务",
+    fullPage: "全文翻译使用",
+    selection: "划词翻译使用",
     translationStyle: "翻译风格",
     styleNews: "新闻 / 忠实报道",
     styleGeneral: "通用 / 自然中文",
@@ -203,22 +212,27 @@ const I18N = {
     saveSettings: "保存设置",
     reset: "重置",
     debugLog: "调试日志",
-    unnamedProvider: "未命名 Provider",
-    newProviderProfileName: "新 Provider",
-    migratedLocalProvider: "迁移的本地 Provider",
+    unnamedProvider: "未命名服务",
+    newProviderProfileName: "新服务",
+    draftProviderName: "未保存服务草稿",
+    defaultGeminiServiceName: "Gemini API",
+    defaultLocalServiceName: "本地 LLM",
+    migratedLocalProvider: "迁移的本地服务",
     apiUrlRequired: "错误：API 地址不能为空。",
+    modelNameRequired: "错误：模型名称不能为空。",
     settingsSaved: "设置已保存。",
     restoredDefaults: "已恢复默认值。点击保存后生效。",
-    newProviderCreated: "已创建新 Provider。填写信息后保存。",
-    atLeastOneProvider: "至少需要保留一个 Provider。",
-    providerDeleted: "Provider 已删除。点击保存后生效。",
+    newProviderCreated: "已创建新服务草稿。填写后点击“保存服务”。",
+    atLeastOneProvider: "至少需要保留一个服务。",
+    providerDeleted: "服务已删除。点击“保存设置”后生效。",
+    providerSaved: "服务已保存。",
     setApiUrlFirst: "请先设置 API 地址。",
     fetchingModels: "正在加载模型...",
     failed: "失败：{error}",
     runtimeError: "运行时错误：{error}",
     backgroundFetchFailed: "后台加载失败：{error}",
     loadedModels: "已加载 {count} 个模型。",
-    loadedProfiles: "已加载 {count} 个 Provider 配置。",
+    loadedProfiles: "已加载 {count} 个服务。",
     debugFetchingModels: "正在为 {name} 加载模型：{url}"
   }
 };
@@ -364,21 +378,45 @@ function getCurrentProvider() {
 }
 
 function getProviderById(providerId) {
-  return settings.providerProfiles.find(p => p.id === providerId) || settings.providerProfiles[0];
+  if (!providerId) return null;
+  return settings.providerProfiles.find(p => p.id === providerId) || null;
 }
 
 function saveCurrentProviderFromForm() {
   const provider = getCurrentProvider();
   if (!provider) return;
 
-  provider.name = $("providerName").value.trim() || t("unnamedProvider");
+  provider.name = $("providerName").value.trim();
   provider.providerType = $("providerType").value === "gemini" ? "gemini" : "openai";
   if (provider.providerType === "gemini" && !$("apiUrl").value.trim()) {
     $("apiUrl").value = "https://generativelanguage.googleapis.com/v1beta";
   }
   provider.apiUrl = $("apiUrl").value.trim();
   provider.apiKey = $("apiKey").value.trim();
-  provider.modelName = $("modelName").value.trim() || DEFAULT_PROVIDER.modelName;
+  provider.modelName = $("modelName").value.trim();
+}
+
+function isDraftProviderName(name) {
+  const value = String(name || "").trim();
+  return !value || value === t("newProviderProfileName") || value === t("unnamedProvider");
+}
+
+function getDefaultProviderName(provider) {
+  return provider?.providerType === "gemini" ? t("defaultGeminiServiceName") : t("defaultLocalServiceName");
+}
+
+function ensureProviderName(provider) {
+  if (!provider) return;
+  if (isDraftProviderName(provider.name)) {
+    provider.name = getDefaultProviderName(provider);
+    if (provider.id === currentProviderId) {
+      $("providerName").value = provider.name;
+    }
+  }
+}
+
+function formatProviderLabel(provider) {
+  return provider.name || t("draftProviderName");
 }
 
 function populateProviderForm(provider) {
@@ -454,30 +492,44 @@ function maybeApplyProviderTypeDefaults() {
   provider.providerType = nextType;
 
   if (nextType === "gemini" && (previousType !== "gemini" || !$("apiUrl").value.trim())) {
+    if (!$("providerName").value.trim() || $("providerName").value.trim() === t("newProviderProfileName")) {
+      $("providerName").value = t("defaultGeminiServiceName");
+    }
     $("apiUrl").value = "https://generativelanguage.googleapis.com/v1beta";
     if (!provider.modelName || provider.modelName === DEFAULT_PROVIDER.modelName) {
       $("modelName").value = "gemini-2.5-flash";
     }
+  } else if (nextType === "openai" && !$("providerName").value.trim()) {
+    $("providerName").value = t("defaultLocalServiceName");
   }
 
   updateProviderTypeHint();
   renderModelSelect(provider);
 }
 
-function renderProviderSelect(selectEl, selectedId) {
+function renderProviderSelect(selectEl, selectedId, options = {}) {
   selectEl.innerHTML = "";
+
+  if (options.placeholder) {
+    const placeholder = document.createElement("option");
+    placeholder.value = "";
+    placeholder.textContent = t("providerSelectPlaceholder");
+    placeholder.disabled = true;
+    placeholder.selected = !selectedId;
+    selectEl.appendChild(placeholder);
+  }
 
   settings.providerProfiles.forEach(provider => {
     const option = document.createElement("option");
     option.value = provider.id;
-    option.textContent = provider.name || provider.modelName || provider.id;
+    option.textContent = formatProviderLabel(provider);
     if (provider.id === selectedId) option.selected = true;
     selectEl.appendChild(option);
   });
 }
 
 function renderAllSelects() {
-  renderProviderSelect($("providerSelect"), currentProviderId);
+  renderProviderSelect($("providerSelect"), currentProviderId, { placeholder: true });
   renderProviderSelect($("pageProviderSelect"), settings.pageProviderId);
   renderProviderSelect($("selectionProviderSelect"), settings.selectionProviderId);
   $("deleteProvider").disabled = settings.providerProfiles.length <= 1;
@@ -588,12 +640,20 @@ function saveOptions() {
   settings.ui = readUiFromForm();
   settings.translation = readTranslationFromForm();
 
-  const activeProvider = getProviderById(currentProviderId);
+  const activeProvider = getProviderById(currentProviderId) || getCurrentProvider();
 
-  if (!activeProvider.apiUrl) {
+  if (!activeProvider || !activeProvider.apiUrl) {
     showStatus(t("apiUrlRequired"), false);
     return;
   }
+
+  if (!activeProvider.modelName) {
+    showStatus(t("modelNameRequired"), false);
+    return;
+  }
+
+  ensureProviderName(activeProvider);
+  settings.activeProviderId = activeProvider.id;
 
   chrome.storage.local.set({
     providerProfiles: settings.providerProfiles,
@@ -611,6 +671,56 @@ function saveOptions() {
     showStatus(t("settingsSaved"), true);
     chrome.runtime.sendMessage({ type: "CONFIG_UPDATED" });
     renderAllSelects();
+  });
+}
+
+function saveProviderQuick() {
+  saveCurrentProviderFromForm();
+
+  const provider = getCurrentProvider();
+  if (!provider) return;
+
+  if (!provider.apiUrl) {
+    showStatus(t("apiUrlRequired"), false);
+    return;
+  }
+
+  if (!provider.modelName) {
+    showStatus(t("modelNameRequired"), false);
+    return;
+  }
+
+  ensureProviderName(provider);
+
+  if (!settings.pageProviderId || !getProviderById(settings.pageProviderId)) {
+    settings.pageProviderId = provider.id;
+  }
+
+  if (!settings.selectionProviderId || !getProviderById(settings.selectionProviderId)) {
+    settings.selectionProviderId = provider.id;
+  }
+
+  settings.activeProviderId = provider.id;
+  settings.capture = readCaptureFromForm();
+  settings.ui = readUiFromForm();
+  settings.translation = readTranslationFromForm();
+
+  chrome.storage.local.set({
+    providerProfiles: settings.providerProfiles,
+    activeProviderId: settings.activeProviderId,
+    pageProviderId: settings.pageProviderId,
+    selectionProviderId: settings.selectionProviderId,
+    capture: settings.capture,
+    ui: settings.ui,
+    translation: settings.translation,
+    apiUrl: provider.apiUrl,
+    apiKey: provider.apiKey,
+    modelName: provider.modelName
+  }, () => {
+    chrome.runtime.sendMessage({ type: "CONFIG_UPDATED" });
+    renderAllSelects();
+    populateProviderForm(provider);
+    showStatus(t("providerSaved"), true);
   });
 }
 
@@ -638,18 +748,21 @@ function addProvider() {
   saveCurrentProviderFromForm();
 
   const provider = {
-    ...clone(DEFAULT_PROVIDER),
     id: `provider-${Date.now()}`,
-    name: t("newProviderProfileName"),
-    providerType: "openai",
+    name: "",
+    providerType: "gemini",
+    apiUrl: "https://generativelanguage.googleapis.com/v1beta",
     apiKey: "",
+    modelName: "",
     models: []
   };
 
   settings.providerProfiles.push(provider);
   currentProviderId = provider.id;
+  settings.activeProviderId = provider.id;
   renderAllSelects();
   populateProviderForm(provider);
+  $("providerName").select();
   showStatus(t("newProviderCreated"), true);
 }
 
@@ -805,6 +918,7 @@ $("providerType").addEventListener("change", () => {
 });
 
 $("addProvider").addEventListener("click", addProvider);
+$("saveProvider").addEventListener("click", saveProviderQuick);
 $("deleteProvider").addEventListener("click", deleteProvider);
 $("fetchModels").addEventListener("click", fetchModels);
 $("save").addEventListener("click", saveOptions);

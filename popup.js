@@ -126,7 +126,7 @@ function render() {
 }
 
 async function updateProviderRoute(useCase, providerId) {
-  setStatus("正在切换 Provider…");
+  setStatus("正在切换服务…");
   const response = await sendRuntimeMessage({
     type: "SET_PROVIDER_FOR_USE_CASE",
     useCase,
@@ -134,7 +134,7 @@ async function updateProviderRoute(useCase, providerId) {
   });
   runtimeState = response.state;
   render();
-  setStatus("Provider 已切换");
+  setStatus("服务已切换");
 }
 
 async function updateProviderModel(useCase, providerId, modelName) {

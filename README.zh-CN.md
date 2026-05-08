@@ -10,10 +10,10 @@
 
 - 全文双语翻译，带段落级等待状态和进度提示。
 - 划词、短语、句子、段落翻译弹窗。
-- 支持多个 LLM Provider 配置。
+- 支持多个 LLM 翻译服务配置。
 - 支持 OpenAI-compatible API，例如 Open WebUI、LM Studio、Ollama 网关等。
 - 支持 Gemini Native API。
-- 全文翻译和划词翻译可以使用不同 Provider。
+- 全文翻译和划词翻译可以使用不同翻译服务。
 - 支持新闻、通用、文学/散文、学术等翻译风格。
 - 词卡收藏到 Obsidian：包含中文解释、英文上下文、上下文翻译、来源、复习清单、欧路链接。
 - 段落卡收藏到 Obsidian。
@@ -30,9 +30,9 @@
 3. 开启开发者模式。
 4. 点击“加载解压缩的扩展”。
 5. 选择本项目目录。
-6. 打开扩展设置页，配置至少一个 Provider。
+6. 打开扩展设置页，配置至少一个翻译服务。
 
-## Provider 配置
+## 翻译服务配置
 
 ### 本地 OpenAI-Compatible 服务
 
@@ -40,7 +40,7 @@
 
 示例：
 
-- Provider Type：`OpenAI Compatible`
+- 服务类型：`OpenAI Compatible`
 - API URL：`http://127.0.0.1:3000/api/chat/completions`
 - API Key：如果本地服务不需要鉴权，可以留空
 - Model：可以点击 Load Models，也可以手动填写模型名
@@ -49,7 +49,7 @@
 
 适合 Google Gemini API。
 
-- Provider Type：`Gemini Native`
+- 服务类型：`Gemini Native`
 - API Key：填写 Gemini API key
 - API URL：扩展会自动填入默认 Gemini API base URL
 - Model：可以 Load Models，也可以手动填写，例如 `gemini-2.5-flash`
@@ -73,7 +73,7 @@ Local REST API 模式可以更安静，但需要额外安装 Obsidian REST 插�
 ## 隐私说明
 
 - API key 和同步凭证保存在浏览器扩展本地存储中。
-- 被翻译的选中文本和网页文本会发送给你配置的 LLM Provider。
+- 被翻译的选中文本和网页文本会发送给你配置的 LLM 翻译服务。
 - 开启欧路同步时，选中的词或短语会发送给欧路 OpenAPI。
 - Obsidian URI 同步会通过本机 `obsidian://` app link 传递生成的 Markdown 内容。
 - 本仓库不包含个人 API key、token 或真实 vault 路径。

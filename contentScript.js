@@ -641,7 +641,7 @@ function renderFloatingPanel(state) {
   header.appendChild(title);
   header.appendChild(closeBtn);
 
-  const providerField = createFloatingField("全文 Provider");
+  const providerField = createFloatingField("全文服务");
   const providerSelect = document.createElement("select");
   providerSelect.className = "bilingual-floating-select";
   (state.providerProfiles || []).forEach(provider => {
@@ -652,7 +652,7 @@ function renderFloatingPanel(state) {
     providerSelect.appendChild(option);
   });
   providerSelect.addEventListener("change", () => {
-    setFloatingStatus("正在切换 Provider…");
+    setFloatingStatus("正在切换全文服务…");
     sendRuntimeMessage({
       type: "SET_PROVIDER_FOR_USE_CASE",
       useCase: "page",
@@ -660,7 +660,7 @@ function renderFloatingPanel(state) {
     })
       .then(response => {
         renderFloatingPanel(response.state);
-        showTranslationToast("全文 Provider 已切换");
+        showTranslationToast("全文服务已切换");
       })
       .catch(err => setFloatingStatus(`切换失败：${err.message}`));
   });
@@ -701,7 +701,7 @@ function renderFloatingPanel(state) {
   });
   modelField.appendChild(modelSelect);
 
-  const selectionProviderField = createFloatingField("划词 Provider");
+  const selectionProviderField = createFloatingField("划词服务");
   const selectionProviderSelect = document.createElement("select");
   selectionProviderSelect.className = "bilingual-floating-select";
   (state.providerProfiles || []).forEach(provider => {
@@ -712,7 +712,7 @@ function renderFloatingPanel(state) {
     selectionProviderSelect.appendChild(option);
   });
   selectionProviderSelect.addEventListener("change", () => {
-    setFloatingStatus("正在切换划词 Provider…");
+    setFloatingStatus("正在切换划词服务…");
     sendRuntimeMessage({
       type: "SET_PROVIDER_FOR_USE_CASE",
       useCase: "selection",
@@ -720,7 +720,7 @@ function renderFloatingPanel(state) {
     })
       .then(response => {
         renderFloatingPanel(response.state);
-        showTranslationToast("划词 Provider 已切换");
+        showTranslationToast("划词服务已切换");
       })
       .catch(err => setFloatingStatus(`切换失败：${err.message}`));
   });

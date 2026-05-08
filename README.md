@@ -10,10 +10,10 @@ This is not a general replacement for mature translation products such as Immers
 
 - Full-page bilingual translation with per-paragraph progress feedback.
 - Selection translation popup for words, phrases, sentences, and passages.
-- Multiple provider profiles for local LLM endpoints and external APIs.
-- OpenAI-compatible providers, such as Open WebUI, LM Studio, Ollama-compatible gateways, and similar chat-completion APIs.
-- Gemini native provider support.
-- Separate provider routing for full-page translation and selection translation.
+- Multiple translation services for local LLM endpoints and external APIs.
+- OpenAI-compatible services, such as Open WebUI, LM Studio, Ollama-compatible gateways, and similar chat-completion APIs.
+- Gemini native service support.
+- Separate service routing for full-page translation and selection translation.
 - Translation styles for news, general prose, literary writing, and academic text.
 - Term-card capture to Obsidian with the selected term, Chinese meaning, English context, translated context, source link, review checklist, and Eudic deep link.
 - Passage-card capture to Obsidian.
@@ -30,9 +30,9 @@ This project is currently distributed as an unpacked browser extension.
 3. Enable Developer mode.
 4. Click "Load unpacked".
 5. Select this project folder.
-6. Open the extension options page and configure at least one provider profile.
+6. Open the extension options page and configure at least one translation service.
 
-## Provider Setup
+## Translation Service Setup
 
 ### Local OpenAI-Compatible Endpoint
 
@@ -40,7 +40,7 @@ Use this for local tools such as Open WebUI or LM Studio.
 
 Example:
 
-- Provider type: `OpenAI Compatible`
+- Service type: `OpenAI Compatible`
 - API URL: `http://127.0.0.1:3000/api/chat/completions`
 - API key: leave empty if your local endpoint does not require authentication
 - Model: load models or type the model name manually
@@ -49,7 +49,7 @@ Example:
 
 Use this for Google's Gemini API.
 
-- Provider type: `Gemini Native`
+- Service type: `Gemini Native`
 - API key: paste your Gemini API key
 - API URL: the extension fills the default Gemini API base URL for you
 - Model: load models or type a model name such as `gemini-2.5-flash`
@@ -73,7 +73,7 @@ Longer sentence and passage selections are saved to Obsidian only.
 ## Privacy
 
 - API keys and sync credentials are stored in browser extension local storage.
-- Selected text and page text are sent to the LLM provider you configure.
+- Selected text and page text are sent to the LLM service you configure.
 - Eudic sync sends selected terms to Eudic OpenAPI when enabled.
 - Obsidian URI sync sends generated markdown content through the local `obsidian://` app link.
 - The repository does not include personal API keys, tokens, or vault paths.
