@@ -439,6 +439,34 @@
     </div>
   </section>
 
+  <section>
+    <h2 data-i18n="floatingBall">Floating Ball</h2>
+    <div class="check-row">
+      <input type="checkbox" id="floatingBallEnabled">
+      <label for="floatingBallEnabled" data-i18n="enableFloatingBall">Show page floating ball</label>
+    </div>
+    <div class="hint" data-i18n="floatingBallHint">Shows a small page control for full-page translation, toggling translations, and quick model/style switching.</div>
+
+    <div class="row" style="margin-top: 12px;">
+      <div class="form-group">
+        <label for="floatingBallPosition" data-i18n="floatingBallPosition">Position</label>
+        <select id="floatingBallPosition">
+          <option value="right" data-i18n="positionRight">Right</option>
+          <option value="left" data-i18n="positionLeft">Left</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="floatingBallOpacity" data-i18n="floatingBallOpacity">Opacity</label>
+        <input type="text" id="floatingBallOpacity" placeholder="82">
+      </div>
+    </div>
+
+    <div class="check-row">
+      <input type="checkbox" id="floatingBallHoverOnly">
+      <label for="floatingBallHoverOnly" data-i18n="floatingBallHoverOnly">Dim until hover</label>
+    </div>
+  </section>
+
   <div id="status"></div>
 
   <div class="actions">

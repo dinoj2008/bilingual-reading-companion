@@ -28,7 +28,11 @@ const DEFAULT_CAPTURE = {
 };
 
 const DEFAULT_UI = {
-  selectionPopupFontSize: 15
+  selectionPopupFontSize: 15,
+  floatingBallEnabled: true,
+  floatingBallPosition: "right",
+  floatingBallOpacity: 82,
+  floatingBallHoverOnly: false
 };
 
 const DEFAULT_TRANSLATION = {
@@ -289,6 +293,7 @@ function getRuntimeState() {
     pageProviderId: settings.pageProviderId,
     selectionProviderId: settings.selectionProviderId,
     translation: settings.translation,
+    ui: settings.ui,
     promptProfiles: getPromptProfileSummaries()
   };
 }

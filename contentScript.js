@@ -8,11 +8,16 @@ const MIN_TEXT_LENGTH = 20;
 const processedBlocks = new WeakSet();
 
 const DEFAULT_UI_SETTINGS = {
-  selectionPopupFontSize: 15
+  selectionPopupFontSize: 15,
+  floatingBallEnabled: true,
+  floatingBallPosition: "right",
+  floatingBallOpacity: 82,
+  floatingBallHoverOnly: false
 };
 
 const SELECTION_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 const SELECTION_CACHE_MAX = 80;
+const PROMPT_PROFILE_ORDER = ["news", "general", "literary", "academic"];
 
 const selectionTranslationCache = new Map();
 
@@ -26,6 +31,9 @@ let selectionPopupHideTimer = null;   // 翻译弹窗自动隐藏计时器
 let selectionPopup = null;            // 当前弹窗 DOM
 let selectionPopupPinned = false;     // 是否已固定到右下角
 let selectionPopupDocClickHandler = null; // 点击页面关闭弹窗的监听器引用
+let floatingRoot = null;
+let floatingPanel = null;
+let floatingPanelDocClickHandler = null;
 
 function log(...args) {
   console.log("[BilingualExt CS]", ...args);
@@ -39,6 +47,7 @@ function loadUiSettings() {
       ...DEFAULT_UI_SETTINGS,
       ...(items.ui || {})
     };
+    syncFloatingBall();
   });
 }
 
@@ -50,6 +59,7 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
       ...DEFAULT_UI_SETTINGS,
       ...(changes.ui.newValue || {})
     };
+    syncFloatingBall();
   }
 });
 
@@ -424,6 +434,306 @@ function toggleBilingualTranslations() {
   return { hidden: bilingualTranslationsHidden, count: blocks.length };
 }
 
+function sendRuntimeMessage(message) {
+  return new Promise((resolve, reject) => {
+    chrome.runtime.sendMessage(message, (response) => {
+      if (chrome.runtime.lastError) {
+        reject(new Error(chrome.runtime.lastError.message));
+        return;
+      }
+      if (!response || !response.ok) {
+        reject(new Error(response?.error || "操作失败"));
+        return;
+      }
+      resolve(response);
+    });
+  });
+}
+
+function getFloatingProvider(state, providerId) {
+  return state?.providerProfiles?.find(provider => provider.id === providerId) ||
+    state?.providerProfiles?.[0] ||
+    null;
+}
+
+function getFloatingModelOptions(provider) {
+  const models = [];
+  const seen = new Set();
+
+  [provider?.modelName, ...(provider?.models || [])].forEach(model => {
+    const clean = String(model || "").trim();
+    if (!clean || seen.has(clean)) return;
+    seen.add(clean);
+    models.push(clean);
+  });
+
+  return models;
+}
+
+function destroyFloatingBall() {
+  closeFloatingPanel();
+  if (floatingRoot) {
+    floatingRoot.remove();
+    floatingRoot = null;
+    floatingPanel = null;
+  }
+}
+
+function syncFloatingBall() {
+  if (!document.body) {
+    setTimeout(syncFloatingBall, 100);
+    return;
+  }
+
+  if (!uiSettings.floatingBallEnabled) {
+    destroyFloatingBall();
+    return;
+  }
+
+  injectBilingualStyles();
+
+  if (!floatingRoot) {
+    floatingRoot = document.createElement("div");
+    floatingRoot.id = "bilingual-floating-root";
+
+    const ball = document.createElement("button");
+    ball.type = "button";
+    ball.className = "bilingual-floating-ball";
+    ball.textContent = "译";
+    ball.title = "双语阅读伴侣";
+    ball.addEventListener("click", (event) => {
+      event.stopPropagation();
+      toggleFloatingPanel();
+    });
+
+    floatingPanel = document.createElement("div");
+    floatingPanel.className = "bilingual-floating-panel hidden";
+
+    floatingRoot.appendChild(ball);
+    floatingRoot.appendChild(floatingPanel);
+    document.body.appendChild(floatingRoot);
+  }
+
+  floatingRoot.classList.toggle("bilingual-floating-left", uiSettings.floatingBallPosition === "left");
+  floatingRoot.classList.toggle("bilingual-floating-right", uiSettings.floatingBallPosition !== "left");
+  floatingRoot.classList.toggle("bilingual-floating-hover-only", Boolean(uiSettings.floatingBallHoverOnly));
+  floatingRoot.style.opacity = String(Math.max(20, Math.min(100, Number(uiSettings.floatingBallOpacity) || 82)) / 100);
+}
+
+function toggleFloatingPanel() {
+  if (!floatingPanel) return;
+
+  if (!floatingPanel.classList.contains("hidden")) {
+    closeFloatingPanel();
+    return;
+  }
+
+  openFloatingPanel();
+}
+
+function openFloatingPanel() {
+  syncFloatingBall();
+  if (!floatingPanel) return;
+
+  floatingPanel.classList.remove("hidden");
+  floatingPanel.innerHTML = `<div class="bilingual-floating-status">正在读取设置…</div>`;
+
+  detachFloatingPanelDocClickHandler();
+  floatingPanelDocClickHandler = (event) => {
+    if (!floatingRoot || floatingRoot.contains(event.target)) return;
+    closeFloatingPanel();
+  };
+  document.addEventListener("mousedown", floatingPanelDocClickHandler, true);
+
+  sendRuntimeMessage({ type: "GET_POPUP_STATE" })
+    .then(response => renderFloatingPanel(response.state))
+    .catch(err => {
+      if (!floatingPanel) return;
+      floatingPanel.innerHTML = `<div class="bilingual-floating-status">读取失败：${err.message}</div>`;
+    });
+}
+
+function closeFloatingPanel() {
+  if (floatingPanel) {
+    floatingPanel.classList.add("hidden");
+  }
+  detachFloatingPanelDocClickHandler();
+}
+
+function detachFloatingPanelDocClickHandler() {
+  if (floatingPanelDocClickHandler) {
+    document.removeEventListener("mousedown", floatingPanelDocClickHandler, true);
+    floatingPanelDocClickHandler = null;
+  }
+}
+
+function renderFloatingPanel(state) {
+  if (!floatingPanel || !state) return;
+
+  const pageProvider = getFloatingProvider(state, state.pageProviderId);
+  const pageModels = getFloatingModelOptions(pageProvider);
+  const promptProfiles = state.promptProfiles || {};
+
+  floatingPanel.innerHTML = "";
+
+  const header = document.createElement("div");
+  header.className = "bilingual-floating-header";
+
+  const title = document.createElement("span");
+  title.textContent = "双语阅读";
+
+  const closeBtn = document.createElement("button");
+  closeBtn.type = "button";
+  closeBtn.className = "bilingual-floating-close";
+  closeBtn.textContent = "×";
+  closeBtn.addEventListener("click", (event) => {
+    event.stopPropagation();
+    closeFloatingPanel();
+  });
+
+  header.appendChild(title);
+  header.appendChild(closeBtn);
+
+  const actions = document.createElement("div");
+  actions.className = "bilingual-floating-actions";
+
+  const translateBtn = document.createElement("button");
+  translateBtn.type = "button";
+  translateBtn.className = "bilingual-floating-button";
+  translateBtn.textContent = "全文翻译";
+  translateBtn.addEventListener("click", () => {
+    closeFloatingPanel();
+    makePageBilingual();
+  });
+
+  const toggleBtn = document.createElement("button");
+  toggleBtn.type = "button";
+  toggleBtn.className = "bilingual-floating-button secondary";
+  toggleBtn.textContent = "显示/隐藏";
+  toggleBtn.addEventListener("click", () => {
+    toggleBilingualTranslations();
+  });
+
+  actions.appendChild(translateBtn);
+  actions.appendChild(toggleBtn);
+
+  const providerField = createFloatingField("全文 Provider");
+  const providerSelect = document.createElement("select");
+  providerSelect.className = "bilingual-floating-select";
+  (state.providerProfiles || []).forEach(provider => {
+    const option = document.createElement("option");
+    option.value = provider.id;
+    option.textContent = provider.name || provider.modelName || provider.id;
+    if (provider.id === pageProvider?.id) option.selected = true;
+    providerSelect.appendChild(option);
+  });
+  providerSelect.addEventListener("change", () => {
+    setFloatingStatus("正在切换 Provider…");
+    sendRuntimeMessage({
+      type: "SET_PROVIDER_FOR_USE_CASE",
+      useCase: "page",
+      providerId: providerSelect.value
+    })
+      .then(response => {
+        renderFloatingPanel(response.state);
+        showTranslationToast("全文 Provider 已切换");
+      })
+      .catch(err => setFloatingStatus(`切换失败：${err.message}`));
+  });
+  providerField.appendChild(providerSelect);
+
+  const modelField = createFloatingField("全文模型");
+  const modelSelect = document.createElement("select");
+  modelSelect.className = "bilingual-floating-select";
+  if (!pageModels.length) {
+    const option = document.createElement("option");
+    option.value = "";
+    option.textContent = "请到设置页加载模型";
+    modelSelect.appendChild(option);
+    modelSelect.disabled = true;
+  } else {
+    pageModels.forEach(model => {
+      const option = document.createElement("option");
+      option.value = model;
+      option.textContent = model;
+      if (model === pageProvider?.modelName) option.selected = true;
+      modelSelect.appendChild(option);
+    });
+  }
+  modelSelect.addEventListener("change", () => {
+    if (!modelSelect.value || !pageProvider?.id) return;
+    setFloatingStatus("正在切换模型…");
+    sendRuntimeMessage({
+      type: "SET_PROVIDER_MODEL",
+      useCase: "page",
+      providerId: pageProvider.id,
+      modelName: modelSelect.value
+    })
+      .then(response => {
+        renderFloatingPanel(response.state);
+        showTranslationToast(`全文模型已切换：${modelSelect.value}`);
+      })
+      .catch(err => setFloatingStatus(`切换失败：${err.message}`));
+  });
+  modelField.appendChild(modelSelect);
+
+  const profileField = createFloatingField("翻译风格");
+  const profileSelect = document.createElement("select");
+  profileSelect.className = "bilingual-floating-select";
+  PROMPT_PROFILE_ORDER.forEach(id => {
+    if (!promptProfiles[id]) return;
+    const option = document.createElement("option");
+    option.value = id;
+    option.textContent = promptProfiles[id].label || id;
+    if (id === state.translation?.promptProfile) option.selected = true;
+    profileSelect.appendChild(option);
+  });
+  profileSelect.addEventListener("change", () => {
+    setFloatingStatus("正在切换风格…");
+    sendRuntimeMessage({
+      type: "SET_PROMPT_PROFILE",
+      promptProfile: profileSelect.value
+    })
+      .then(response => {
+        renderFloatingPanel(response.state);
+        showTranslationToast("翻译风格已切换");
+      })
+      .catch(err => setFloatingStatus(`切换失败：${err.message}`));
+  });
+  profileField.appendChild(profileSelect);
+
+  const status = document.createElement("div");
+  status.className = "bilingual-floating-status";
+  status.textContent = pageProvider?.modelName ? `当前：${pageProvider.modelName}` : "当前模型未设置";
+
+  floatingPanel.appendChild(header);
+  floatingPanel.appendChild(actions);
+  floatingPanel.appendChild(providerField);
+  floatingPanel.appendChild(modelField);
+  floatingPanel.appendChild(profileField);
+  floatingPanel.appendChild(status);
+}
+
+function createFloatingField(labelText) {
+  const field = document.createElement("div");
+  field.className = "bilingual-floating-field";
+
+  const label = document.createElement("div");
+  label.className = "bilingual-floating-label";
+  label.textContent = labelText;
+
+  field.appendChild(label);
+  return field;
+}
+
+function setFloatingStatus(text) {
+  if (!floatingPanel) return;
+  const status = floatingPanel.querySelector(".bilingual-floating-status");
+  if (status) {
+    status.textContent = text;
+  }
+}
+
 function injectBilingualStyles() {
   if (bilingualStylesInjected) return;
   bilingualStylesInjected = true;
@@ -521,6 +831,134 @@ function injectBilingualStyles() {
       border-radius: 999px !important;
       font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
       box-shadow: 0 8px 24px rgba(15, 23, 42, 0.22) !important;
+    }
+
+    #bilingual-floating-root {
+      position: fixed !important;
+      top: 46% !important;
+      z-index: 999998 !important;
+      display: flex !important;
+      align-items: flex-start !important;
+      gap: 8px !important;
+      font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+      color: #172033 !important;
+      transition: opacity 0.18s ease, transform 0.18s ease !important;
+    }
+
+    #bilingual-floating-root.bilingual-floating-right {
+      right: 12px !important;
+      flex-direction: row-reverse !important;
+    }
+
+    #bilingual-floating-root.bilingual-floating-left {
+      left: 12px !important;
+      flex-direction: row !important;
+    }
+
+    #bilingual-floating-root.bilingual-floating-hover-only:not(:hover) {
+      opacity: 0.35 !important;
+    }
+
+    .bilingual-floating-ball {
+      width: 42px !important;
+      height: 42px !important;
+      border: 0 !important;
+      border-radius: 999px !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      color: #fff !important;
+      background: #2563eb !important;
+      box-shadow: 0 10px 26px rgba(37, 99, 235, 0.36) !important;
+      cursor: pointer !important;
+      font: 700 16px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+      user-select: none !important;
+    }
+
+    .bilingual-floating-panel {
+      width: 270px !important;
+      max-width: calc(100vw - 72px) !important;
+      padding: 10px !important;
+      border: 1px solid rgba(148, 163, 184, 0.45) !important;
+      border-radius: 8px !important;
+      color: #172033 !important;
+      background: rgba(255, 255, 255, 0.98) !important;
+      box-shadow: 0 16px 40px rgba(15, 23, 42, 0.18) !important;
+    }
+
+    .bilingual-floating-panel.hidden {
+      display: none !important;
+    }
+
+    .bilingual-floating-header {
+      display: flex !important;
+      align-items: center !important;
+      justify-content: space-between !important;
+      gap: 8px !important;
+      margin-bottom: 8px !important;
+      color: #172033 !important;
+      font-weight: 700 !important;
+    }
+
+    .bilingual-floating-close {
+      border: 0 !important;
+      background: transparent !important;
+      color: #64748b !important;
+      cursor: pointer !important;
+      font: 700 18px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+    }
+
+    .bilingual-floating-actions {
+      display: grid !important;
+      grid-template-columns: 1fr 1fr !important;
+      gap: 7px !important;
+      margin-bottom: 9px !important;
+    }
+
+    .bilingual-floating-button {
+      min-height: 32px !important;
+      border: 0 !important;
+      border-radius: 6px !important;
+      color: #fff !important;
+      background: #2563eb !important;
+      cursor: pointer !important;
+      font: 700 12px/1.2 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+    }
+
+    .bilingual-floating-button.secondary {
+      color: #172033 !important;
+      background: #f1f5f9 !important;
+      border: 1px solid #d9e0ea !important;
+    }
+
+    .bilingual-floating-field {
+      display: grid !important;
+      gap: 5px !important;
+      margin-top: 8px !important;
+    }
+
+    .bilingual-floating-label {
+      color: #334155 !important;
+      font-size: 12px !important;
+      font-weight: 700 !important;
+    }
+
+    .bilingual-floating-select {
+      width: 100% !important;
+      min-height: 31px !important;
+      padding: 5px 7px !important;
+      border: 1px solid #d9e0ea !important;
+      border-radius: 6px !important;
+      color: #172033 !important;
+      background: #fff !important;
+      font: 12px/1.3 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+    }
+
+    .bilingual-floating-status {
+      min-height: 16px !important;
+      margin-top: 8px !important;
+      color: #64748b !important;
+      font-size: 12px !important;
     }
 
     @keyframes bilingual-spin {

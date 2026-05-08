@@ -27,7 +27,11 @@ const DEFAULT_CAPTURE = {
 
 const DEFAULT_UI = {
   selectionPopupFontSize: 15,
-  optionsLanguage: "auto"
+  optionsLanguage: "auto",
+  floatingBallEnabled: true,
+  floatingBallPosition: "right",
+  floatingBallOpacity: 82,
+  floatingBallHoverOnly: false
 };
 
 const DEFAULT_TRANSLATION = {
@@ -97,6 +101,14 @@ const I18N = {
     fontMedium: "Medium",
     fontLarge: "Large",
     fontExtraLarge: "Extra Large",
+    floatingBall: "Floating Ball",
+    enableFloatingBall: "Show page floating ball",
+    floatingBallHint: "Shows a small page control for full-page translation, toggling translations, and quick model/style switching.",
+    floatingBallPosition: "Position",
+    positionRight: "Right",
+    positionLeft: "Left",
+    floatingBallOpacity: "Opacity",
+    floatingBallHoverOnly: "Dim until hover",
     saveSettings: "Save Settings",
     reset: "Reset",
     debugLog: "Debug Log",
@@ -180,6 +192,14 @@ const I18N = {
     fontMedium: "中",
     fontLarge: "大",
     fontExtraLarge: "超大",
+    floatingBall: "页面悬浮球",
+    enableFloatingBall: "显示页面悬浮球",
+    floatingBallHint: "在网页侧边显示一个小控制入口，用于全文翻译、隐藏/显示译文，以及快速切换模型和风格。",
+    floatingBallPosition: "位置",
+    positionRight: "右侧",
+    positionLeft: "左侧",
+    floatingBallOpacity: "透明度",
+    floatingBallHoverOnly: "鼠标悬停前弱化显示",
     saveSettings: "保存设置",
     reset: "重置",
     debugLog: "调试日志",
@@ -500,12 +520,20 @@ function readCaptureFromForm() {
 function populateUiForm() {
   $("selectionPopupFontSize").value = String(settings.ui.selectionPopupFontSize || DEFAULT_UI.selectionPopupFontSize);
   $("optionsLanguage").value = settings.ui.optionsLanguage || DEFAULT_UI.optionsLanguage;
+  $("floatingBallEnabled").checked = Boolean(settings.ui.floatingBallEnabled ?? DEFAULT_UI.floatingBallEnabled);
+  $("floatingBallPosition").value = settings.ui.floatingBallPosition || DEFAULT_UI.floatingBallPosition;
+  $("floatingBallOpacity").value = String(settings.ui.floatingBallOpacity ?? DEFAULT_UI.floatingBallOpacity);
+  $("floatingBallHoverOnly").checked = Boolean(settings.ui.floatingBallHoverOnly ?? DEFAULT_UI.floatingBallHoverOnly);
 }
 
 function readUiFromForm() {
   return {
     selectionPopupFontSize: Number($("selectionPopupFontSize").value) || DEFAULT_UI.selectionPopupFontSize,
-    optionsLanguage: $("optionsLanguage").value || DEFAULT_UI.optionsLanguage
+    optionsLanguage: $("optionsLanguage").value || DEFAULT_UI.optionsLanguage,
+    floatingBallEnabled: $("floatingBallEnabled").checked,
+    floatingBallPosition: $("floatingBallPosition").value === "left" ? "left" : "right",
+    floatingBallOpacity: Math.max(20, Math.min(100, Number($("floatingBallOpacity").value) || DEFAULT_UI.floatingBallOpacity)),
+    floatingBallHoverOnly: $("floatingBallHoverOnly").checked
   };
 }
 
