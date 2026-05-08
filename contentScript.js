@@ -427,7 +427,7 @@ function toggleBilingualTranslations() {
 
   bilingualTranslationsHidden = !bilingualTranslationsHidden;
   blocks.forEach(block => {
-    block.style.display = bilingualTranslationsHidden ? "none" : "";
+    setTranslationBlockVisibility(block);
   });
 
   showTranslationToast(bilingualTranslationsHidden ? "已隐藏译文" : "已显示译文");
@@ -436,6 +436,16 @@ function toggleBilingualTranslations() {
 
 function getTranslationBlocks() {
   return Array.from(document.querySelectorAll(".bilingual-zh[data-bilingual-inserted='true']"));
+}
+
+function setTranslationBlockVisibility(block) {
+  if (!block) return;
+
+  if (bilingualTranslationsHidden) {
+    block.style.setProperty("display", "none", "important");
+  } else {
+    block.style.removeProperty("display");
+  }
 }
 
 function quickTogglePageTranslation() {
@@ -1152,7 +1162,7 @@ function placeTranslationBlock(el, block) {
 function completeTranslationBlock(el, block, zh) {
   block.className = "bilingual-zh";
   block.textContent = zh.trim();
-  block.style.display = bilingualTranslationsHidden ? "none" : "";
+  setTranslationBlockVisibility(block);
   el.setAttribute("data-bilingual-processed", "true");
   el.removeAttribute("data-bilingual-processing");
   processedBlocks.add(el);
