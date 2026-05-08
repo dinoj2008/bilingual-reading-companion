@@ -418,7 +418,7 @@ function setCachedSelectionTranslation(key, value) {
 
 function toggleBilingualTranslations() {
   injectBilingualStyles();
-  const blocks = Array.from(document.querySelectorAll(".bilingual-zh[data-bilingual-inserted='true']"));
+  const blocks = getTranslationBlocks();
 
   if (!blocks.length) {
     showTranslationToast("当前页面还没有译文");
@@ -432,6 +432,25 @@ function toggleBilingualTranslations() {
 
   showTranslationToast(bilingualTranslationsHidden ? "已隐藏译文" : "已显示译文");
   return { hidden: bilingualTranslationsHidden, count: blocks.length };
+}
+
+function getTranslationBlocks() {
+  return Array.from(document.querySelectorAll(".bilingual-zh[data-bilingual-inserted='true']"));
+}
+
+function quickTogglePageTranslation() {
+  if (isPageTranslating) {
+    const countText = pageTranslationHud?.querySelector(".bilingual-hud-count")?.textContent || "";
+    showTranslationToast(countText ? `正在翻译页面：${countText}` : "页面正在翻译中，请稍等");
+    return;
+  }
+
+  if (getTranslationBlocks().length) {
+    toggleBilingualTranslations();
+    return;
+  }
+
+  makePageBilingual();
 }
 
 function sendRuntimeMessage(message) {
@@ -496,12 +515,26 @@ function syncFloatingBall() {
     floatingRoot = document.createElement("div");
     floatingRoot.id = "bilingual-floating-root";
 
-    const ball = document.createElement("button");
-    ball.type = "button";
-    ball.className = "bilingual-floating-ball";
-    ball.textContent = "译";
-    ball.title = "双语阅读伴侣";
-    ball.addEventListener("click", (event) => {
+    const buttonStack = document.createElement("div");
+    buttonStack.className = "bilingual-floating-buttons";
+
+    const quickBtn = document.createElement("button");
+    quickBtn.type = "button";
+    quickBtn.className = "bilingual-floating-ball bilingual-floating-quick";
+    quickBtn.textContent = "译";
+    quickBtn.title = "翻译/显示原文";
+    quickBtn.addEventListener("click", (event) => {
+      event.stopPropagation();
+      closeFloatingPanel();
+      quickTogglePageTranslation();
+    });
+
+    const menuBtn = document.createElement("button");
+    menuBtn.type = "button";
+    menuBtn.className = "bilingual-floating-ball bilingual-floating-menu";
+    menuBtn.textContent = "☰";
+    menuBtn.title = "快速设置";
+    menuBtn.addEventListener("click", (event) => {
       event.stopPropagation();
       toggleFloatingPanel();
     });
@@ -509,7 +542,9 @@ function syncFloatingBall() {
     floatingPanel = document.createElement("div");
     floatingPanel.className = "bilingual-floating-panel hidden";
 
-    floatingRoot.appendChild(ball);
+    buttonStack.appendChild(quickBtn);
+    buttonStack.appendChild(menuBtn);
+    floatingRoot.appendChild(buttonStack);
     floatingRoot.appendChild(floatingPanel);
     document.body.appendChild(floatingRoot);
   }
@@ -572,6 +607,8 @@ function renderFloatingPanel(state) {
 
   const pageProvider = getFloatingProvider(state, state.pageProviderId);
   const pageModels = getFloatingModelOptions(pageProvider);
+  const selectionProvider = getFloatingProvider(state, state.selectionProviderId);
+  const selectionModels = getFloatingModelOptions(selectionProvider);
   const promptProfiles = state.promptProfiles || {};
 
   floatingPanel.innerHTML = "";
@@ -593,29 +630,6 @@ function renderFloatingPanel(state) {
 
   header.appendChild(title);
   header.appendChild(closeBtn);
-
-  const actions = document.createElement("div");
-  actions.className = "bilingual-floating-actions";
-
-  const translateBtn = document.createElement("button");
-  translateBtn.type = "button";
-  translateBtn.className = "bilingual-floating-button";
-  translateBtn.textContent = "全文翻译";
-  translateBtn.addEventListener("click", () => {
-    closeFloatingPanel();
-    makePageBilingual();
-  });
-
-  const toggleBtn = document.createElement("button");
-  toggleBtn.type = "button";
-  toggleBtn.className = "bilingual-floating-button secondary";
-  toggleBtn.textContent = "显示/隐藏";
-  toggleBtn.addEventListener("click", () => {
-    toggleBilingualTranslations();
-  });
-
-  actions.appendChild(translateBtn);
-  actions.appendChild(toggleBtn);
 
   const providerField = createFloatingField("全文 Provider");
   const providerSelect = document.createElement("select");
@@ -677,6 +691,66 @@ function renderFloatingPanel(state) {
   });
   modelField.appendChild(modelSelect);
 
+  const selectionProviderField = createFloatingField("划词 Provider");
+  const selectionProviderSelect = document.createElement("select");
+  selectionProviderSelect.className = "bilingual-floating-select";
+  (state.providerProfiles || []).forEach(provider => {
+    const option = document.createElement("option");
+    option.value = provider.id;
+    option.textContent = provider.name || provider.modelName || provider.id;
+    if (provider.id === selectionProvider?.id) option.selected = true;
+    selectionProviderSelect.appendChild(option);
+  });
+  selectionProviderSelect.addEventListener("change", () => {
+    setFloatingStatus("正在切换划词 Provider…");
+    sendRuntimeMessage({
+      type: "SET_PROVIDER_FOR_USE_CASE",
+      useCase: "selection",
+      providerId: selectionProviderSelect.value
+    })
+      .then(response => {
+        renderFloatingPanel(response.state);
+        showTranslationToast("划词 Provider 已切换");
+      })
+      .catch(err => setFloatingStatus(`切换失败：${err.message}`));
+  });
+  selectionProviderField.appendChild(selectionProviderSelect);
+
+  const selectionModelField = createFloatingField("划词模型");
+  const selectionModelSelect = document.createElement("select");
+  selectionModelSelect.className = "bilingual-floating-select";
+  if (!selectionModels.length) {
+    const option = document.createElement("option");
+    option.value = "";
+    option.textContent = "请到设置页加载模型";
+    selectionModelSelect.appendChild(option);
+    selectionModelSelect.disabled = true;
+  } else {
+    selectionModels.forEach(model => {
+      const option = document.createElement("option");
+      option.value = model;
+      option.textContent = model;
+      if (model === selectionProvider?.modelName) option.selected = true;
+      selectionModelSelect.appendChild(option);
+    });
+  }
+  selectionModelSelect.addEventListener("change", () => {
+    if (!selectionModelSelect.value || !selectionProvider?.id) return;
+    setFloatingStatus("正在切换划词模型…");
+    sendRuntimeMessage({
+      type: "SET_PROVIDER_MODEL",
+      useCase: "selection",
+      providerId: selectionProvider.id,
+      modelName: selectionModelSelect.value
+    })
+      .then(response => {
+        renderFloatingPanel(response.state);
+        showTranslationToast(`划词模型已切换：${selectionModelSelect.value}`);
+      })
+      .catch(err => setFloatingStatus(`切换失败：${err.message}`));
+  });
+  selectionModelField.appendChild(selectionModelSelect);
+
   const profileField = createFloatingField("翻译风格");
   const profileSelect = document.createElement("select");
   profileSelect.className = "bilingual-floating-select";
@@ -704,12 +778,16 @@ function renderFloatingPanel(state) {
 
   const status = document.createElement("div");
   status.className = "bilingual-floating-status";
-  status.textContent = pageProvider?.modelName ? `当前：${pageProvider.modelName}` : "当前模型未设置";
+  status.textContent = [
+    pageProvider?.modelName ? `全文：${pageProvider.modelName}` : "全文模型未设置",
+    selectionProvider?.modelName ? `划词：${selectionProvider.modelName}` : "划词模型未设置"
+  ].join(" / ");
 
   floatingPanel.appendChild(header);
-  floatingPanel.appendChild(actions);
   floatingPanel.appendChild(providerField);
   floatingPanel.appendChild(modelField);
+  floatingPanel.appendChild(selectionProviderField);
+  floatingPanel.appendChild(selectionModelField);
   floatingPanel.appendChild(profileField);
   floatingPanel.appendChild(status);
 }
@@ -859,6 +937,11 @@ function injectBilingualStyles() {
       opacity: 0.35 !important;
     }
 
+    .bilingual-floating-buttons {
+      display: grid !important;
+      gap: 8px !important;
+    }
+
     .bilingual-floating-ball {
       width: 42px !important;
       height: 42px !important;
@@ -875,8 +958,16 @@ function injectBilingualStyles() {
       user-select: none !important;
     }
 
+    .bilingual-floating-menu {
+      color: #2563eb !important;
+      background: #fff !important;
+      border: 1px solid rgba(37, 99, 235, 0.22) !important;
+      box-shadow: 0 8px 22px rgba(15, 23, 42, 0.16) !important;
+      font-size: 17px !important;
+    }
+
     .bilingual-floating-panel {
-      width: 270px !important;
+      width: 286px !important;
       max-width: calc(100vw - 72px) !important;
       padding: 10px !important;
       border: 1px solid rgba(148, 163, 184, 0.45) !important;
