@@ -611,56 +611,59 @@ function setupFloatingDrag(buttonStack) {
     if (event.button !== 0 || !floatingRoot) return;
 
     const rect = floatingRoot.getBoundingClientRect();
+    const pointerId = event.pointerId;
+
+    const handlePointerMove = (moveEvent) => {
+      if (!floatingDragState || moveEvent.pointerId !== pointerId || !floatingRoot) return;
+
+      const deltaY = moveEvent.clientY - floatingDragState.startY;
+      if (Math.abs(deltaY) > 4) {
+        floatingDragState.moved = true;
+        floatingRoot.classList.add("bilingual-floating-dragging");
+      }
+
+      if (!floatingDragState.moved) return;
+
+      const margin = 12;
+      const maxTop = Math.max(margin, window.innerHeight - getFloatingRootHeight() - margin);
+      const nextTop = Math.max(margin, Math.min(maxTop, floatingDragState.startTop + deltaY));
+
+      floatingDragState.currentTop = nextTop;
+      floatingRoot.style.setProperty("top", `${Math.round(nextTop)}px`, "important");
+      moveEvent.preventDefault();
+    };
+
+    const finishDrag = (finishEvent) => {
+      if (!floatingDragState || finishEvent.pointerId !== pointerId) return;
+
+      document.removeEventListener("pointermove", handlePointerMove, true);
+      document.removeEventListener("pointerup", finishDrag, true);
+      document.removeEventListener("pointercancel", finishDrag, true);
+      floatingRoot?.classList.remove("bilingual-floating-dragging");
+
+      if (floatingDragState.moved) {
+        floatingSuppressNextClick = true;
+        persistFloatingBallTop(getFloatingPercentFromTop(floatingDragState.currentTop));
+        setTimeout(() => {
+          floatingSuppressNextClick = false;
+        }, 250);
+      }
+
+      floatingDragState = null;
+    };
+
     floatingDragState = {
-      pointerId: event.pointerId,
+      pointerId,
       startY: event.clientY,
       startTop: rect.top,
       currentTop: rect.top,
       moved: false
     };
 
-    buttonStack.setPointerCapture?.(event.pointerId);
-    floatingRoot.classList.add("bilingual-floating-dragging");
+    document.addEventListener("pointermove", handlePointerMove, true);
+    document.addEventListener("pointerup", finishDrag, true);
+    document.addEventListener("pointercancel", finishDrag, true);
   });
-
-  buttonStack.addEventListener("pointermove", (event) => {
-    if (!floatingDragState || event.pointerId !== floatingDragState.pointerId || !floatingRoot) return;
-
-    const deltaY = event.clientY - floatingDragState.startY;
-    if (Math.abs(deltaY) > 4) {
-      floatingDragState.moved = true;
-    }
-
-    if (!floatingDragState.moved) return;
-
-    const margin = 12;
-    const maxTop = Math.max(margin, window.innerHeight - getFloatingRootHeight() - margin);
-    const nextTop = Math.max(margin, Math.min(maxTop, floatingDragState.startTop + deltaY));
-
-    floatingDragState.currentTop = nextTop;
-    floatingRoot.style.setProperty("top", `${Math.round(nextTop)}px`, "important");
-    event.preventDefault();
-  });
-
-  const finishDrag = (event) => {
-    if (!floatingDragState || event.pointerId !== floatingDragState.pointerId) return;
-
-    buttonStack.releasePointerCapture?.(event.pointerId);
-    floatingRoot?.classList.remove("bilingual-floating-dragging");
-
-    if (floatingDragState.moved) {
-      floatingSuppressNextClick = true;
-      persistFloatingBallTop(getFloatingPercentFromTop(floatingDragState.currentTop));
-      setTimeout(() => {
-        floatingSuppressNextClick = false;
-      }, 250);
-    }
-
-    floatingDragState = null;
-  };
-
-  buttonStack.addEventListener("pointerup", finishDrag);
-  buttonStack.addEventListener("pointercancel", finishDrag);
 }
 
 function syncFloatingBall() {
